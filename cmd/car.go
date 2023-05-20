@@ -7,6 +7,7 @@ import (
 	"chainstoragesdk/model"
 	"chainstoragesdk/utils"
 	"fmt"
+	"github.com/cheggaaa/pb/v3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 )
 
 func init() {
@@ -306,7 +308,6 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string, i
 	if carFileSize > int64(carFileShardingThreshold) {
 		response, err = UploadBigCarFile(sdk, &carFileUploadReq)
 		if err != nil {
-			fmt.Printf("Error:%+v\n", err)
 			return response, sdkcode.ErrCarUploadFileFail
 		}
 
@@ -314,9 +315,22 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string, i
 	}
 
 	// 普通上传
-	response, err = sdk.Car.UploadCarFile(&carFileUploadReq)
+	file, err := os.Open(fileDestination)
+	defer file.Close()
+	fi, err := file.Stat()
 	if err != nil {
-		fmt.Printf("Error:%+v\n", err)
+		return response, sdkcode.ErrCarUploadFileFail
+	}
+	size := fi.Size()
+
+	bar := pb.Start64(size).SetWriter(os.Stdout).Set(pb.Bytes, true)
+	bar.SetRefreshRate(100 * time.Millisecond)
+	defer bar.Finish()
+
+	extReader := bar.NewProxyReader(file)
+
+	response, err = sdk.Car.UploadCarFileExt(&carFileUploadReq, extReader)
+	if err != nil {
 		return response, sdkcode.ErrCarUploadFileFail
 	}
 
@@ -349,37 +363,52 @@ func UploadBigCarFile(sdk *chainstoragesdk.CssClient, req *model.CarFileUploadRe
 		}
 	}(shardingCarFileUploadReqs)
 
+	totalSize := int64(0)
+	for i, _ := range shardingCarFileUploadReqs {
+		totalSize += shardingCarFileUploadReqs[i].ObjectSize
+	}
+
+	bar := pb.Start64(totalSize).SetWriter(os.Stdout).Set(pb.Bytes, true)
+	bar.SetRefreshRate(100 * time.Millisecond)
+	defer bar.Finish()
+
 	// 上传CAR文件分片
 	//uploadingReqs := []model.CarFileUploadReq{}
 	//deepcopier.Copy(&shardingCarFileUploadReqs).To(&uploadingReqs)
 	// todo: 添加配置，重试3次，每次间隔3秒
-	//maxRetries := 3
-	//retryDelay := time.Duration(3) * time.Second
+	maxRetries := 3
+	retryDelay := time.Duration(3) * time.Second
 
 	uploadRespList := []model.ShardingCarFileUploadResponse{}
 	for i, _ := range shardingCarFileUploadReqs {
-		//for j := 0; j < maxRetries; j++ {
-		uploadingReq := model.CarFileUploadReq{}
-		deepcopier.Copy(&shardingCarFileUploadReqs[i]).To(&uploadingReq)
+		for j := 0; j < maxRetries; j++ {
+			uploadingReq := model.CarFileUploadReq{}
+			deepcopier.Copy(&shardingCarFileUploadReqs[i]).To(&uploadingReq)
 
-		uploadResp, err := sdk.Car.UploadShardingCarFile(&uploadingReq)
-		if err == nil && uploadResp.Code == http.StatusOK {
-			uploadRespList = append(uploadRespList, uploadResp)
-			break
-		}
-		// todo: log err?
+			file, err := os.Open(uploadingReq.FileDestination)
+			defer file.Close()
+			//fi, err := file.Stat()
+			//size := fi.Size()
+			extReader := bar.NewProxyReader(file)
 
-		//if j == maxRetries-1 {
-		//	// 尝试maxRetries次失败
-		if err != nil {
-			return response, err
-		} else if uploadResp.Code != http.StatusOK {
-			return response, errors.New(response.Msg)
+			uploadResp, err := sdk.Car.UploadShardingCarFileExt(&uploadingReq, extReader)
+			if err == nil && uploadResp.Code == http.StatusOK {
+				uploadRespList = append(uploadRespList, uploadResp)
+				break
+			}
+			// todo: log err?
+
+			if j == maxRetries-1 {
+				// 尝试maxRetries次失败
+				if err != nil {
+					return response, err
+				} else if uploadResp.Code != http.StatusOK {
+					return response, errors.New(response.Msg)
+				}
+			}
+
+			time.Sleep(retryDelay)
 		}
-		//}
-		//
-		//time.Sleep(retryDelay)
-		//}
 	}
 
 	// 确认分片上传成功
@@ -553,3 +582,21 @@ type CarImportOutput struct {
 //}
 
 // endregion CAR Import
+
+//func makeBar(req *model.CarFileUploadReq) *pb.ProgressBar {
+//	objectSize := int(req.ObjectSize)
+//	bar := pb.New(objectSize).
+//
+//	bar := pb.New(int(sourceSize)).SetUnits(pb.U_BYTES).SetRefreshRate(time.Millisecond * 10)
+//	bar.ShowSpeed = true
+//	bar.
+//	// show percents (by default already true)
+//	bar.ShowPercent = true
+//
+//	// show bar (by default already true)
+//	bar.ShowBar = true
+//
+//	bar.ShowCounters = true
+//
+//	bar.ShowTimeLeft = true
+//}
