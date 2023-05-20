@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"chainstoragesdk"
-	sdkcode "chainstoragesdk/code"
-	"chainstoragesdk/consts"
-	"chainstoragesdk/model"
-	"chainstoragesdk/utils"
 	"fmt"
 	"github.com/cheggaaa/pb/v3"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
+	"github.com/paradeum-team/chainstorage-sdk/consts"
+	"github.com/paradeum-team/chainstorage-sdk/model"
+	"github.com/paradeum-team/chainstorage-sdk/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

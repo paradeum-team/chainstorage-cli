@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"chainstoragesdk"
-	sdkcode "chainstoragesdk/code"
-	"chainstoragesdk/model"
 	"context"
 	"fmt"
 	"github.com/Code-Hex/pget"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
+	"github.com/paradeum-team/chainstorage-sdk/model"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

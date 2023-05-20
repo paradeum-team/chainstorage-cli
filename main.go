@@ -21,7 +21,7 @@ THE SOFTWARE.
 */
 package main
 
-import "chainstorage-cli/cmd"
+import "github.com/paradeum-team/chainstorage-cli/cmd"
 
 func main() {
 	cmd.Execute()

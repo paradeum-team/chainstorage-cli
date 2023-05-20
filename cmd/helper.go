@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	sdkcode "chainstoragesdk/code"
 	"fmt"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
