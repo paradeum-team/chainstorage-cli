@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"

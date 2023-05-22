@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk"
-	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
-	"github.com/paradeum-team/chainstorage-sdk/consts"
-	"github.com/paradeum-team/chainstorage-sdk/model"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
+	"github.com/paradeum-team/chainstorage-sdk/sdk/consts"
+	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
