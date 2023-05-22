@@ -117,4 +117,4 @@ require (
 	github.com/paradeum-team/chainstorage-sdk/sdk v0.0.0-20230522083708-3022df5c4d3c
 )
 
-replace github.com/paradeum-team/chainstorage-sdk/sdk => /Users/yuan/code/chainstorage-sdk/sdk
+//replace github.com/paradeum-team/chainstorage-sdk/sdk => /Users/yuan/code/chainstorage-sdk/sdk
