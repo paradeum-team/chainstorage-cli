@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func Error(cmd *cobra.Command, args []string, err error) {
@@ -92,4 +93,9 @@ func checkObjectName(objectName string) error {
 	}
 
 	return nil
+}
+
+func GetTimestampString() string {
+	timestampString := time.Now().Format("2006-01-02 15:04:05.000000000") //当前时间的字符串，2006-01-02 15:04:05据说是golang的诞生时间，固定写法
+	return timestampString
 }

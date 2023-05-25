@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/alanshaw/go-carbites"
 	"github.com/cheggaaa/pb/v3"
 	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
 	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
@@ -9,9 +10,11 @@ import (
 	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
 	"github.com/paradeum-team/chainstorage-sdk/sdk/utils"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/ulule/deepcopier"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -68,7 +71,7 @@ func carUploadRun(cmd *cobra.Command, args []string) {
 	//	Error(cmd, args, err)
 	//}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -210,18 +213,20 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string, i
 
 	fileDestination := dataPath
 	if !isCarFile {
-		// add constant
-		//carVersion := 1
 		fileDestination = sdk.Car.GenerateTempFileName(utils.CurrentDate()+"_", ".tmp")
 		//fileDestination := GenerateTempFileName("", ".tmp")
-		//fmt.Printf("UploadData carVersion:%d, fileDestination:%s, dataPath:%s\n", carVersion, fileDestination, dataPath)
+		// add constant
+		carVersion := 1
+		fmt.Printf("UploadData carVersion:%d, fileDestination:%s, dataPath:%s\n", carVersion, fileDestination, dataPath)
 
+		fmt.Printf("Create car file start, begintime:%s\n", GetTimestampString())
 		// 创建Car文件
 		err = sdk.Car.CreateCarFile(dataPath, fileDestination)
 		if err != nil {
 			fmt.Printf("Error:%+v\n", err)
 			return response, sdkcode.ErrCarUploadFileCreateCarFileFail
 		}
+		fmt.Printf("Create car file finish, endtime:%s\n", GetTimestampString())
 
 		// todo: 清除CAR文件，添加utils?
 		defer func(fileDestination string) {
@@ -328,11 +333,16 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string, i
 	defer bar.Finish()
 
 	extReader := bar.NewProxyReader(file)
+	defer extReader.Close()
 
+	fmt.Printf("UploadData => UploadCarFileExt, parameter carFileUploadReq:%+v\n", carFileUploadReq)
+	fmt.Printf("Upload car file start, begintime:%s\n", GetTimestampString())
 	response, err = sdk.Car.UploadCarFileExt(&carFileUploadReq, extReader)
 	if err != nil {
 		return response, sdkcode.ErrCarUploadFileFail
 	}
+	fmt.Printf("Upload car file finish, endtime:%s\n", GetTimestampString())
+	fmt.Printf("UploadData => UploadCarFileExt, response:%+v\n", response)
 
 	return response, err
 }
@@ -341,12 +351,20 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string, i
 func UploadBigCarFile(sdk *chainstoragesdk.CssClient, req *model.CarFileUploadReq) (model.ObjectCreateResponse, error) {
 	response := model.ObjectCreateResponse{}
 
+	logrus.Debugf("UploadBigCarFile => GenerateShardingCarFiles, parameter req:%+v\n", req)
+	fmt.Printf("UploadBigCarFile => GenerateShardingCarFiles, parameter req:%+v\n", req)
+	fmt.Printf("Generate sharding car files start, begintime:%s\n", GetTimestampString())
 	// 生成CAR分片文件
 	shardingCarFileUploadReqs := []model.CarFileUploadReq{}
-	err := sdk.Car.GenerateShardingCarFiles(req, &shardingCarFileUploadReqs)
+	//err := sdk.Car.GenerateShardingCarFiles(req, &shardingCarFileUploadReqs)
+	err := GenerateShardingCarFiles(req, &shardingCarFileUploadReqs)
 	if err != nil {
 		return response, err
 	}
+	fmt.Printf("Generate sharding car files finish, endtime:%s\n", GetTimestampString())
+	fmt.Printf("UploadBigCarFile => GenerateShardingCarFiles, parameter shardingCarFileUploadReqs:%+v\n", shardingCarFileUploadReqs)
+	logrus.Debugf("UploadBigCarFile => GenerateShardingCarFiles, parameter shardingCarFileUploadReqs:%+v\n", shardingCarFileUploadReqs)
+
 	//todo:delete CAR分片文件
 	defer func(shardingCarFileUploadReqs []model.CarFileUploadReq) {
 		if !viper.GetBool("cmd.clean_tmp_data") {
@@ -379,6 +397,7 @@ func UploadBigCarFile(sdk *chainstoragesdk.CssClient, req *model.CarFileUploadRe
 	maxRetries := 3
 	retryDelay := time.Duration(3) * time.Second
 
+	fmt.Printf("Upload sharding car file start, begintime:%s\n", GetTimestampString())
 	uploadRespList := []model.ShardingCarFileUploadResponse{}
 	for i, _ := range shardingCarFileUploadReqs {
 		for j := 0; j < maxRetries; j++ {
@@ -390,13 +409,16 @@ func UploadBigCarFile(sdk *chainstoragesdk.CssClient, req *model.CarFileUploadRe
 			//fi, err := file.Stat()
 			//size := fi.Size()
 			extReader := bar.NewProxyReader(file)
+			defer extReader.Close()
 
+			fmt.Printf("UploadBigCarFile => GenerateShardingCarFiles, index:%d, parameter uploadingReq:%+v\n", i, uploadingReq)
 			uploadResp, err := sdk.Car.UploadShardingCarFileExt(&uploadingReq, extReader)
 			if err == nil && uploadResp.Code == http.StatusOK {
 				uploadRespList = append(uploadRespList, uploadResp)
 				break
 			}
 			// todo: log err?
+			fmt.Printf("UploadBigCarFile => GenerateShardingCarFiles, index:%d, uploadResp:%+v\n", i, uploadResp)
 
 			if j == maxRetries-1 {
 				// 尝试maxRetries次失败
@@ -410,12 +432,17 @@ func UploadBigCarFile(sdk *chainstoragesdk.CssClient, req *model.CarFileUploadRe
 			time.Sleep(retryDelay)
 		}
 	}
+	fmt.Printf("Upload sharding car file finish, endtime:%s\n", GetTimestampString())
 
+	fmt.Printf("UploadBigCarFile => ConfirmShardingCarFiles, parameter req:%+v\n", req)
+	fmt.Printf("Confirm sharding car file start, begintime:%s\n", GetTimestampString())
 	// 确认分片上传成功
 	response, err = sdk.Car.ConfirmShardingCarFiles(req)
 	if err != nil {
 		return response, err
 	}
+	fmt.Printf("Confirm sharding car file finish, endtime:%s\n", GetTimestampString())
+	fmt.Printf("UploadBigCarFile => ConfirmShardingCarFiles, response:%+v\n", response)
 
 	return response, nil
 }
@@ -459,7 +486,7 @@ func carImportRun(cmd *cobra.Command, args []string) {
 	//	Error(cmd, args, err)
 	//}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -600,3 +627,114 @@ type CarImportOutput struct {
 //
 //	bar.ShowTimeLeft = true
 //}
+
+// 生成CAR分片文件
+func GenerateShardingCarFiles(req *model.CarFileUploadReq, shardingCarFileUploadReqs *[]model.CarFileUploadReq) error {
+	fileDestination := req.FileDestination
+
+	bigCarFile, err := os.Open(fileDestination)
+	if err != nil {
+		return err
+	}
+	defer bigCarFile.Close()
+
+	// CAR文件分片设置
+	targetSize := 3145728 //1024 * 1024     // 1MiB chunks
+	//strategy := carbites.Treewalk // also carbites.Treewalk
+	//spltr, _ := carbites.Split(bigCarFile, targetSize, strategy)
+	spltr, _ := carbites.NewTreewalkSplitterFromPath(fileDestination, targetSize)
+
+	//shardingCarFileDestinationList := []string{}
+	shardingNo := 1
+	//var shardingNo int = 1
+
+	for {
+		car, err := spltr.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			//panic(err)
+
+			fmt.Printf("Error:%+v\n", err)
+			return err
+		}
+
+		fmt.Printf("gernerate chunk shardingNo:%d start\n", shardingNo)
+		//logrus.Debug(err)
+		bytes, err := io.ReadAll(car)
+		if err != nil {
+			//panic(err)
+
+			fmt.Printf("Error:%+v\n", err)
+			logrus.Debug(err)
+			return err
+		}
+
+		// 设置文件名称
+		filename := fmt.Sprintf("_chunk.c%d", shardingNo)
+		//shardingFileDestination := generateFileName(utils.CurrentDate()+"_", filename)
+		shardingFileDestination := strings.Replace(fileDestination, filepath.Ext(fileDestination), filename, 1)
+		//shardingCarFileDestinationList = append(shardingCarFileDestinationList, shardingFileDestination)
+
+		chunkSize := int64(len(bytes))
+
+		// 生成分片文件
+		//ioutil.WriteFile(fmt.Sprintf("chunk-%d.car", shardingNo), bytes, 0644)
+		err = os.WriteFile(shardingFileDestination, bytes, 0644)
+		if err != nil {
+			//panic(err)
+
+			fmt.Printf("Error:%+v\n", err)
+			logrus.Debug(err)
+			return err
+		}
+		fmt.Printf("gernerate chunk shardingNo:%d end\n", shardingNo)
+
+		fmt.Printf("calculate chunk shardingSha256 start, shardingNo:%d\n", shardingNo)
+		// 计算分片文件sha256
+		shardingSha256, err := utils.GetFileSha256ByPath(shardingFileDestination)
+		if err != nil {
+			//panic(err)
+
+			fmt.Printf("Error:%+v\n", err)
+			logrus.Debug(err)
+			return err
+		}
+		//carFileUploadReq.RawSha256 = shardingSha256
+		fmt.Printf("calculate chunk shardingSha256 end, shardingNo:%d\n", shardingNo)
+
+		shardingNo++
+
+		// 设置分片请求对象
+		shardingCarFileUploadReq := model.CarFileUploadReq{}
+		deepcopier.Copy(req).To(&shardingCarFileUploadReq)
+		shardingCarFileUploadReq.FileDestination = shardingFileDestination
+		shardingCarFileUploadReq.ShardingSha256 = shardingSha256
+		shardingCarFileUploadReq.ShardingNo = shardingNo
+
+		//// todo: remove it
+		//rootLink := model.RootLink{}
+		//parseCarDag(shardingFileDestination, &rootLink)
+		//rootCid := rootLink.RootCid.String()
+		//size := int64(rootLink.Size)
+		//shardingCarFileUploadReq.CarFileCid = rootCid
+		shardingCarFileUploadReq.ObjectSize = chunkSize
+
+		*shardingCarFileUploadReqs = append(*shardingCarFileUploadReqs, shardingCarFileUploadReq)
+	}
+
+	// 分片失败
+	shardingAmount := len(*shardingCarFileUploadReqs)
+	if shardingAmount == 0 {
+		// todo: add constant
+		fmt.Printf("Error:%+v\n", err)
+		logrus.Debug(err)
+		//return err
+		return sdkcode.ErrCarUploadFileChunkCarFileFail
+	}
+
+	req.ShardingAmount = shardingAmount
+
+	return nil
+}

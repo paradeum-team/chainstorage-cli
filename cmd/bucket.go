@@ -61,7 +61,7 @@ func bucketListRun(cmd *cobra.Command, args []string) {
 		pageSize = offset
 	}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -211,7 +211,7 @@ func bucketCreateRun(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -308,7 +308,7 @@ func bucketRemoveRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -411,7 +411,7 @@ func bucketEmptyRun(cmd *cobra.Command, args []string) {
 	//	Error(cmd, args, errors.New("empty bucket operation, add --force to confirm emptying"))
 	//}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}

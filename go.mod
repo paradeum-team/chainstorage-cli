@@ -80,6 +80,7 @@ require (
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/sirupsen/logrus v1.9.2 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
@@ -117,4 +118,4 @@ require (
 	github.com/paradeum-team/chainstorage-sdk/sdk v0.0.0-20230522083708-3022df5c4d3c
 )
 
-//replace github.com/paradeum-team/chainstorage-sdk/sdk => /Users/yuan/code/chainstorage-sdk/sdk
+replace github.com/paradeum-team/chainstorage-sdk/sdk => /Users/yuan/code/chainstorage-sdk/sdk

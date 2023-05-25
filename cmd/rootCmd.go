@@ -25,11 +25,32 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
+var sdkCfgFile string
+var debug bool
+
+type PlainFormatter struct {
+}
+
+func (f *PlainFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return []byte(fmt.Sprintf("%s\n", entry.Message)), nil
+}
+
+func toggleDebug(cmd *cobra.Command, args []string) {
+	if debug {
+		logrus.Info("Debug logs enabled")
+		logrus.SetLevel(logrus.DebugLevel)
+		logrus.SetFormatter(&logrus.TextFormatter{})
+	} else {
+		plainFormatter := new(PlainFormatter)
+		logrus.SetFormatter(plainFormatter)
+	}
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -39,6 +60,7 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
+	PreRun: toggleDebug,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -58,10 +80,12 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.toml)")
+	rootCmd.PersistentFlags().StringVar(&sdkCfgFile, "sdkConfig", "", "sdk config file (default is ./chainstorage-sdk.yaml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", true, "verbose logging")
 }
 
 // initConfig reads in config file and ENV variables if set.

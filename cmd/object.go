@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Code-Hex/pget"
+	"github.com/ipfs/go-cid"
 	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
 	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
 	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
@@ -56,7 +57,6 @@ func init() {
 //}
 
 func objectListRun(cmd *cobra.Command, args []string) {
-	itemName := ""
 	pageSize := 10
 	pageIndex := 1
 
@@ -66,29 +66,36 @@ func objectListRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
-	// 对象名称
-	objectName, err := cmd.Flags().GetString("name")
-	if err != nil {
-		Error(cmd, args, err)
-	}
-
-	if len(objectName) > 0 {
-		if err := checkObjectName(objectName); err != nil {
-			Error(cmd, args, err)
-		}
-	}
-
 	// 对象CID
 	objectCid, err := cmd.Flags().GetString("cid")
 	if err != nil {
 		Error(cmd, args, err)
 	}
 
+	if len(objectCid) != 0 {
+		_, err = cid.Decode(objectCid)
+		if err != nil {
+			Error(cmd, args, err)
+		}
+	}
+
+	// 对象名称
+	objectName, err := cmd.Flags().GetString("name")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	if len(objectName) != 0 {
+		if err := checkObjectName(objectName); err != nil {
+			Error(cmd, args, err)
+		}
+	}
+
 	// 设置参数
-	if len(objectName) > 0 {
-		itemName = objectName
-	} else if len(objectCid) > 0 {
-		itemName = objectCid
+	// todo: Cid和name谁优先？
+	objectItem := objectCid
+	if len(objectName) != 0 {
+		objectItem = objectName
 	}
 
 	// 查询偏移量
@@ -97,7 +104,7 @@ func objectListRun(cmd *cobra.Command, args []string) {
 		pageSize = offset
 	}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -117,7 +124,7 @@ func objectListRun(cmd *cobra.Command, args []string) {
 	bucketId := respBucket.Data.Id
 
 	// 列出桶对象
-	response, err := sdk.Object.GetObjectList(bucketId, itemName, pageSize, pageIndex)
+	response, err := sdk.Object.GetObjectList(bucketId, objectItem, pageSize, pageIndex)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -228,21 +235,34 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
+	// 对象CID
+	objectCid, err := cmd.Flags().GetString("cid")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	if len(objectCid) != 0 {
+		_, err = cid.Decode(objectCid)
+		if err != nil {
+			Error(cmd, args, err)
+		}
+	}
+
 	// 对象名称
 	objectName, err := cmd.Flags().GetString("name")
 	if err != nil {
 		Error(cmd, args, err)
 	}
 
-	if err := checkObjectName(objectName); err != nil {
-		Error(cmd, args, err)
+	if len(objectName) != 0 {
+		if err := checkObjectName(objectName); err != nil {
+			Error(cmd, args, err)
+		}
 	}
 
-	//// 对象CID
-	//objectCid, err := cmd.Flags().GetString("cid")
-	//if err != nil {
-	//	Error(cmd, args, err)
-	//}
+	if len(objectCid) == 0 || len(objectName) == 0 {
+		Error(cmd, args, errors.New("please specify the name or cid"))
+	}
 
 	// 重命名
 	rename, err := cmd.Flags().GetString("rename")
@@ -265,7 +285,7 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -285,18 +305,44 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 	bucketId := respBucket.Data.Id
 
 	// 确认对象数据有效性
-	respObject, err := sdk.Object.GetObjectByName(bucketId, objectName)
-	if err != nil {
-		Error(cmd, args, err)
-	}
+	objectId := 0
+	// todo: Cid和name谁优先？
+	if len(objectCid) != 0 {
+		pageSize := 1000
+		pageIndex := 1
+		respObject, err := sdk.Object.GetObjectList(bucketId, objectCid, pageSize, pageIndex)
+		if err != nil {
+			Error(cmd, args, err)
+		}
 
-	code = int(respObject.Code)
-	if code != http.StatusOK {
-		Error(cmd, args, errors.New(respObject.Msg))
-	}
+		code = int(respObject.Code)
+		if code != http.StatusOK {
+			Error(cmd, args, errors.New(respObject.Msg))
+		}
 
-	// 对象ID
-	objectId := respObject.Data.Id
+		count := respObject.Data.Count
+		if count == 1 {
+			objectId = respObject.Data.List[0].Id
+		} else if count == 0 {
+			Error(cmd, args, sdkcode.ErrObjectNotFound)
+		} else if count > 1 {
+			// todo: please use name query?
+			Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use cid query\n"))
+		}
+	} else {
+		respObject, err := sdk.Object.GetObjectByName(bucketId, objectName)
+		if err != nil {
+			Error(cmd, args, err)
+		}
+
+		code = int(respObject.Code)
+		if code != http.StatusOK {
+			Error(cmd, args, errors.New(respObject.Msg))
+		}
+
+		// 对象ID
+		objectId = respObject.Data.Id
+	}
 
 	// 重命名对象
 	response, err := sdk.Object.RenameObject(objectId, rename, force)
@@ -370,29 +416,38 @@ func objectRemoveRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
+	// 对象CID
+	objectCid, err := cmd.Flags().GetString("cid")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	if len(objectCid) != 0 {
+		_, err = cid.Decode(objectCid)
+		if err != nil {
+			Error(cmd, args, err)
+		}
+	}
+
 	// 对象名称
 	objectName, err := cmd.Flags().GetString("name")
 	if err != nil {
 		Error(cmd, args, err)
 	}
 
-	if err := checkObjectName(objectName); err != nil {
+	if len(objectName) != 0 {
+		if err := checkObjectName(objectName); err != nil {
+			Error(cmd, args, err)
+		}
+	}
+
+	// 强制覆盖
+	force, err := cmd.Flags().GetBool("force")
+	if err != nil {
 		Error(cmd, args, err)
 	}
 
-	//// 对象CID
-	//objectCid, err := cmd.Flags().GetString("cid")
-	//if err != nil {
-	//	Error(cmd, args, err)
-	//}
-
-	//// 强制覆盖
-	//force, err := cmd.Flags().GetBool("force")
-	//if err != nil {
-	//	Error(cmd, args, err)
-	//}
-
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -411,47 +466,48 @@ func objectRemoveRun(cmd *cobra.Command, args []string) {
 	// 桶ID
 	bucketId := respBucket.Data.Id
 
+	// todo: Cid和name谁优先？
+	objectItem := objectCid
+	if len(objectName) != 0 {
+		objectItem = objectName
+	}
+
 	// 确认对象数据有效性
-	respObject, err := sdk.Object.GetObjectByName(bucketId, objectName)
+	objectIdList := []int{}
+	pageSize := 1000
+	pageIndex := 1
+	respObjectList, err := sdk.Object.GetObjectList(bucketId, objectItem, pageSize, pageIndex)
 	if err != nil {
 		Error(cmd, args, err)
 	}
 
-	code = int(respObject.Code)
+	code = int(respObjectList.Code)
 	if code != http.StatusOK {
-		Error(cmd, args, errors.New(respObject.Msg))
+		Error(cmd, args, errors.New(respObjectList.Msg))
 	}
 
-	// 对象ID
-	objectId := respObject.Data.Id
-	objectIdList := []int{objectId}
+	count := respObjectList.Data.Count
+	if count == 1 {
+		// todo：模糊匹配还是精准匹配?
+		rawObjectName := respObjectList.Data.List[0].ObjectName
+		if !force && rawObjectName != objectName {
+			Error(cmd, args, sdkcode.ErrObjectNotFound)
+		}
 
-	//// todo: 批量删除? cid or objectName
-	//itemName := ""
-	//pageSize := 1000
-	//pageIndex := 1
-	//
-	//// 设置参数
-	//if len(objectName) > 0 {
-	//	itemName = objectName
-	//} else if len(objectCid) > 0 {
-	//	itemName = objectCid
-	//}
-	//
-	//pageRespObject, err := sdk.Object.GetObjectList(bucketId, itemName, pageSize, pageIndex)
-	//if err != nil {
-	//	Error(cmd, args, err)
-	//}
-	//
-	//code = int(pageRespObject.Code)
-	//if code != http.StatusOK {
-	//	Error(cmd, args, errors.New(pageRespObject.Msg))
-	//}
-	//
-	//objectIdList := []int{}
-	//for i := range pageRespObject.Data.List {
-	//	objectIdList = append(objectIdList, pageRespObject.Data.List[i].Id)
-	//}
+		objectId := respObjectList.Data.List[0].Id
+		objectIdList = []int{objectId}
+	} else if count == 0 {
+		Error(cmd, args, sdkcode.ErrObjectNotFound)
+	} else if count > 1 {
+		if !force {
+			Error(cmd, args, errors.New("Error: multiple object  are matching this query, add --force to confirm the bulk removal\n"))
+		}
+
+		for i := range respObjectList.Data.List {
+			objectId := respObjectList.Data.List[i].Id
+			objectIdList = append(objectIdList, objectId)
+		}
+	}
 
 	// 重命名对象
 	response, err := sdk.Object.RemoveObject(objectIdList)
@@ -573,21 +629,34 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
+	// 对象CID
+	objectCid, err := cmd.Flags().GetString("cid")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	if len(objectCid) != 0 {
+		_, err = cid.Decode(objectCid)
+		if err != nil {
+			Error(cmd, args, err)
+		}
+	}
+
 	// 对象名称
 	objectName, err := cmd.Flags().GetString("name")
 	if err != nil {
 		Error(cmd, args, err)
 	}
 
-	if err := checkObjectName(objectName); err != nil {
-		Error(cmd, args, err)
+	if len(objectName) != 0 {
+		if err := checkObjectName(objectName); err != nil {
+			Error(cmd, args, err)
+		}
 	}
 
-	//// 对象CID
-	//objectCid, err := cmd.Flags().GetString("cid")
-	//if err != nil {
-	//	Error(cmd, args, err)
-	//}
+	if len(objectCid) == 0 || len(objectName) == 0 {
+		Error(cmd, args, errors.New("please specify the name or cid"))
+	}
 
 	//// 输出路径
 	//target, err := cmd.Flags().GetString("Target")
@@ -595,7 +664,7 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 	//	Error(cmd, args, err)
 	//}
 
-	sdk, err := chainstoragesdk.New()
+	sdk, err := chainstoragesdk.New(sdkCfgFile)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -615,34 +684,52 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 	bucketId := respBucket.Data.Id
 
 	// 确认对象数据有效性
-	respObject, err := sdk.Object.GetObjectByName(bucketId, objectName)
-	if err != nil {
-		Error(cmd, args, err)
+	respObject := model.ObjectCreateResponse{}
+	// todo: Cid和name谁优先？
+	if len(objectCid) != 0 {
+		pageSize := 1000
+		pageIndex := 1
+		respObject, err := sdk.Object.GetObjectList(bucketId, objectCid, pageSize, pageIndex)
+		if err != nil {
+			Error(cmd, args, err)
+		}
+
+		code = int(respObject.Code)
+		if code != http.StatusOK {
+			Error(cmd, args, errors.New(respObject.Msg))
+		}
+
+		count := respObject.Data.Count
+		if count == 0 {
+			Error(cmd, args, sdkcode.ErrObjectNotFound)
+		} else if count > 1 {
+			// todo: please use name query?
+			Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use cid query\n"))
+		}
+	} else {
+		respObject, err := sdk.Object.GetObjectByName(bucketId, objectName)
+		if err != nil {
+			Error(cmd, args, err)
+		}
+
+		code = int(respObject.Code)
+		if code != http.StatusOK {
+			Error(cmd, args, errors.New(respObject.Msg))
+		}
+
+		// 对象CID
+		objectCid = respObject.Data.ObjectCid
 	}
 
-	code = int(respObject.Code)
-	if code != http.StatusOK {
-		Error(cmd, args, errors.New(respObject.Msg))
-	}
-
-	// 对象ID
-	//objectId := respObject.Data.Id
-	//objectName := respObject.Data.ObjectName
-	objectCid := respObject.Data.ObjectCid
-	//downloadEndpoint := "https://test-ipfs-gateway.netwarps.com/ipfs/"
-	//downloadUrl := fmt.Sprintf("%s%s", downloadEndpoint, objectCid)
 	ipfsGateway := viper.GetString("cmd.ipfs_gateway")
 	downloadUrl := fmt.Sprintf("https://%s%s", ipfsGateway, objectCid)
 
-	// todo: remove it
-	//downloadUrl = "https://test-ipfs-gateway.netwarps.com/ipfs/bafybeiguyrqm6z76mrhntk64fiwwdpjqv64ny3ugw64owznlbeotknvypa"
 	cli := pget.New()
 	cli.URLs = []string{downloadUrl}
 	cli.Output = objectName
 
 	version := ""
 	downloadArgs := []string{"-t", "10"}
-
 	if err := cli.Run(context.Background(), version, downloadArgs); err != nil {
 		//if cli.Trace {
 		//	fmt.Fprintf(os.Stderr, "Error:\n%+v\n", err)
