@@ -260,7 +260,7 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	if len(objectCid) == 0 || len(objectName) == 0 {
+	if len(objectCid) == 0 && len(objectName) == 0 {
 		Error(cmd, args, errors.New("please specify the name or cid"))
 	}
 
@@ -654,7 +654,7 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	if len(objectCid) == 0 || len(objectName) == 0 {
+	if len(objectCid) == 0 && len(objectName) == 0 {
 		Error(cmd, args, errors.New("please specify the name or cid"))
 	}
 
