@@ -4,7 +4,6 @@ import (
 	"fmt"
 	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 	"regexp"
 	"strings"
@@ -12,6 +11,7 @@ import (
 )
 
 func Error(cmd *cobra.Command, args []string, err error) {
+	log.Errorf("execute %s args:%v error:%v\n", cmd.Name(), args, err)
 	fmt.Fprintf(os.Stderr, "execute %s args:%v error:%v\n", cmd.Name(), args, err)
 	os.Exit(1)
 }
@@ -22,7 +22,8 @@ func GetBucketName(args []string) string {
 		return bucketName
 	}
 
-	bucketPrefix := viper.GetString("cmd.bucket_prefix")
+	//bucketPrefix := viper.GetString("cli.bucketPrefix")
+	bucketPrefix := cliConfig.BucketPrefix
 
 	for i := range args {
 		arg := args[i]
@@ -41,7 +42,8 @@ func GetDataPath(args []string) string {
 		return dataPath
 	}
 
-	bucketPrefix := viper.GetString("cmd.bucket_prefix")
+	//bucketPrefix := viper.GetString("cli.bucketPrefix")
+	bucketPrefix := cliConfig.BucketPrefix
 
 	for i := range args {
 		arg := args[i]

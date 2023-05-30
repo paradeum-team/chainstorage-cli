@@ -10,7 +10,6 @@ import (
 	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/ulule/deepcopier"
 	"net/http"
 	"os"
@@ -99,12 +98,13 @@ func objectListRun(cmd *cobra.Command, args []string) {
 	}
 
 	// 查询偏移量
-	offset := viper.GetInt("cmd.list_offset")
-	if offset > 0 || offset < 1000 {
+	//offset := viper.GetInt("cli.listOffset")
+	offset := cliConfig.ListOffset
+	if pageSize > 0 || pageSize < 1000 {
 		pageSize = offset
 	}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -175,8 +175,8 @@ Status: {{.Code}}
 {{else}}
 {{- range .List}}
 {{.ObjectCid}} {{.ObjectSize}} {{.CreatedDate}} {{.ObjectName}}
-{{ end}}
-{{- end}}`
+{{- end}}
+{{end}}`
 
 	t, err := template.New("objectListTemplate").Parse(templateContent)
 	if err != nil {
@@ -285,7 +285,7 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -447,7 +447,7 @@ func objectRemoveRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -664,7 +664,7 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 	//	Error(cmd, args, err)
 	//}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -721,7 +721,8 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 		objectCid = respObject.Data.ObjectCid
 	}
 
-	ipfsGateway := viper.GetString("cmd.ipfs_gateway")
+	//ipfsGateway := viper.GetString("cli.ipfsGateway")
+	ipfsGateway := cliConfig.IpfsGateway
 	downloadUrl := fmt.Sprintf("https://%s%s", ipfsGateway, objectCid)
 
 	cli := pget.New()

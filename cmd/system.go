@@ -9,7 +9,7 @@ import (
 )
 
 func ipfsVersionRun(cmd *cobra.Command, args []string) {
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}

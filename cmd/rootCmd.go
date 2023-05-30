@@ -23,6 +23,8 @@ package cmd
 
 import (
 	"fmt"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
+	"github.com/ulule/deepcopier"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -33,6 +35,10 @@ import (
 var cfgFile string
 var sdkCfgFile string
 var debug bool
+var cliConfig CliConfig
+var sdkConfig SdkConfig
+var loggerConfig LoggerConfig
+var appConfig chainstoragesdk.ApplicationConfig
 
 type PlainFormatter struct {
 }
@@ -84,7 +90,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", true, "verbose logging")
 }
 
@@ -115,4 +121,30 @@ func initConfig() {
 		// todo: remove it
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+
+	//cscConfig := CscConfig{}
+	//err := viper.UnmarshalExact(&cscConfig)
+	//if err != nil {
+	//	fmt.Fprintln(os.Stderr, "viper.UnmarshalExact, error:", err)
+	//}
+
+	cscConfig := CscConfig{}
+	err := viper.Unmarshal(&cscConfig)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "config Unmarshal fail, error:%+v\n", err)
+	}
+
+	cliConfig = cscConfig.Cli
+	sdkConfig = cscConfig.Sdk
+	loggerConfig = cscConfig.Logger
+
+	//fmt.Printf("Config struct: %#v\n", cscConfig)
+	//fmt.Printf("All configuration: %+v\n", viper.AllSettings())
+	appConfig = chainstoragesdk.ApplicationConfig{}
+
+	// 设置SDK配置
+	deepcopier.Copy(&sdkConfig).To(&appConfig.Server)
+	deepcopier.Copy(&loggerConfig).To(&appConfig.Logger)
+
+	initLogger()
 }

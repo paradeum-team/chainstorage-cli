@@ -8,7 +8,6 @@ import (
 	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/ulule/deepcopier"
 	"net/http"
 	"os"
@@ -56,12 +55,13 @@ func bucketListRun(cmd *cobra.Command, args []string) {
 	pageIndex := 1
 
 	// 查询偏移量
-	offset := viper.GetInt("cmd.list_offset")
-	if offset > 0 || offset < 1000 {
+	//offset := viper.GetInt("cli.listOffset")
+	offset := cliConfig.ListOffset
+	if pageSize > 0 || pageSize < 1000 {
 		pageSize = offset
 	}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -211,7 +211,7 @@ func bucketCreateRun(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -308,7 +308,7 @@ func bucketRemoveRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -411,7 +411,7 @@ func bucketEmptyRun(cmd *cobra.Command, args []string) {
 	//	Error(cmd, args, errors.New("empty bucket operation, add --force to confirm emptying"))
 	//}
 
-	sdk, err := chainstoragesdk.New(sdkCfgFile)
+	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
 		Error(cmd, args, err)
 	}
