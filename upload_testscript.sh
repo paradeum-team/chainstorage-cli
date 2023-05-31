@@ -90,23 +90,30 @@ testCases() {
   # 3、数据清理
   rm -rf $testDataFolderame
 
+  # 目前暂时不使用--carfile参数
 #  # 对象上传 => 上传carfile => 正确上传car文件 => gcscmd put ./aaa.car cs://bbb --carfile
+#  # 数据准备
+#  # 1、添加对象，10MB
+#  testDataFileName="testdata_"$(date "+%Y%m%d%H%M%S")"-"$RANDOM".dat"
+#  #echo $testDataFileName
+#  dd if=/dev/urandom of=$testDataFileName bs=10240 count=1024
+#  # 2、生成CAR文件(测试环境需要安装car命令行程序)
+#  carFilename=$(echo ${testDataFileName/.dat/.car})
+#  car c --version 1 -f $carFilename $testDataFileName
+#  # 设置当前目录
+#  dataPath=''$carFilename
 #  execCmd '对象上传' '上传carfile' '正确上传car文件' 'gcscmd put '$dataPath' cs://'$bucketName' --carfile' 'put '$dataPath' cs://'$bucketName' --carfile' ''
+#  #  # 3、数据清理
+#  #  rm -rf $testDataFileName
+#  #  rm -rf $dataPath
 #
 #  # 对象上传 => 上传carfile => 重复上传-上传已经存在的car文件 => gcscmd put ./aaa.car cs://bbb --carfile
 #  execCmd '对象上传' '上传carfile' '重复上传-上传已经存在的car文件' 'gcscmd put '$dataPath' cs://'$bucketName' --carfile' 'put '$dataPath' cs://'$bucketName' --carfile' ''
-  echo "_/_/_/_/_/_/_/_/_/_/_/_/_/ 对象上传 结束 _/_/_/_/_/_/_/_/_/_/_/_/_/"
 
-#  echo "_/_/_/_/_/_/_/_/_/_/_/_/_/ 导入car文件 开始 _/_/_/_/_/_/_/_/_/_/_/_/_/"
-#  # 导入 car 文件 => 正确导入car文件 => 当前目录导入 => gcscmd import ./aaa.car cs://bbb
-#  execCmd '导入 car 文件' '正确导入car文件' '当前目录导入' 'gcscmd import '$dataPath' cs://'$bucketName 'import '$dataPath' cs://'$bucketName ''
-#
-#  # 导入 car 文件 => 正确导入car文件 => 绝对路径导入 => gcscmd import /home/pz/aaa.car cs://bbb
-#  execCmd '导入 car 文件' '正确导入car文件' '绝对路径导入' 'gcscmd import '$dataPath' cs://'$bucketName 'import '$dataPath' cs://'$bucketName ''
-#
-#  # 导入 car 文件 => 正确导入car文件 => 相对路径 => gcscmd import ../pz/aaa.car cs://bbb
-#  execCmd '导入 car 文件' '正确导入car文件' '相对路径' 'gcscmd import '$dataPath' cs://'$bucketName 'import '$dataPath' cs://'$bucketName ''
-#  echo "_/_/_/_/_/_/_/_/_/_/_/_/_/ 导入car文件 结束 _/_/_/_/_/_/_/_/_/_/_/_/_/"
+  # 对象上传测试数据清理
+  $cmdPath rb cs://$bucketName --force
+  #  rm -rf $testDataFileName
+  echo "_/_/_/_/_/_/_/_/_/_/_/_/_/ 对象上传 结束 _/_/_/_/_/_/_/_/_/_/_/_/_/"
 }
 
 execCmd() {

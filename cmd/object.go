@@ -689,25 +689,33 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 	if len(objectCid) != 0 {
 		pageSize := 1000
 		pageIndex := 1
-		respObject, err := sdk.Object.GetObjectList(bucketId, objectCid, pageSize, pageIndex)
+		respObjectList, err := sdk.Object.GetObjectList(bucketId, objectCid, pageSize, pageIndex)
 		if err != nil {
 			Error(cmd, args, err)
 		}
 
-		code = int(respObject.Code)
+		code = int(respObjectList.Code)
 		if code != http.StatusOK {
-			Error(cmd, args, errors.New(respObject.Msg))
+			Error(cmd, args, errors.New(respObjectList.Msg))
 		}
 
-		count := respObject.Data.Count
+		count := respObjectList.Data.Count
 		if count == 0 {
 			Error(cmd, args, sdkcode.ErrObjectNotFound)
 		} else if count > 1 {
 			// todo: please use name query?
 			Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use cid query\n"))
 		}
+
+		objectData := respObjectList.Data.List[0]
+		objectName = objectData.ObjectName
+
+		objectCreateResponse := model.ObjectCreateResponse{}
+		deepcopier.Copy(&respObjectList).To(&objectCreateResponse)
+		deepcopier.Copy(&objectData).To(&objectCreateResponse.Data)
+		respObject = objectCreateResponse
 	} else {
-		respObject, err := sdk.Object.GetObjectByName(bucketId, objectName)
+		respObject, err = sdk.Object.GetObjectByName(bucketId, objectName)
 		if err != nil {
 			Error(cmd, args, err)
 		}

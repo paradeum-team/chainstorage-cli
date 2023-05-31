@@ -19,15 +19,28 @@ testCases() {
   resp=$($cmdPath put $testDataFileName cs://$bucketName)
   # 3、获取CID
   cid=$(echo "$resp" | awk '/CID:/{print $2}')
-
+  # 4、清理上传数据
+  rm -rf $testDataFileName
   execCmd '下载对象' '根据cid下载' 'cid正确下载' 'gcscmd get cs://'$bucketName' --cid '$cid 'get cs://'$bucketName' --cid '$cid ''
-  # 4、数据清理
+  # 5、数据清理
   rm -rf $testDataFileName
 
   # 下载对象 => 根据对象名下载 => 对象名正确下载 => gcscmd get cs://bbb --name Tarkov.mp4
+  # 数据准备
+  # 1、添加对象，10MB
+  testDataFileName="testdata_"$(date "+%Y%m%d%H%M%S")"-"$RANDOM".dat"
+  #echo $testDataFileName
+  dd if=/dev/urandom of=$testDataFileName bs=10240 count=1024
+  resp=$($cmdPath put $testDataFileName cs://$bucketName)
+  # 2、获取CID
+  cid=$(echo "$resp" | awk '/CID:/{print $2}')
+  # 3、清理上传数据
+  rm -rf $testDataFileName
   # 设置对象名称
   objectName=$testDataFileName
   execCmd '下载对象' '根据对象名下载' '对象名正确下载' 'gcscmd get cs://'$bucketName' --name '$objectName 'get cs://'$bucketName' --name '$objectName ''
+  # 4、数据清理
+  rm -rf $testDataFileName
 
   # 下载对象测试数据清理
   $cmdPath rb cs://$bucketName --force
