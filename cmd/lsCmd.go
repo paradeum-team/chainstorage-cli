@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -33,7 +32,7 @@ var lsCmd = &cobra.Command{
 	Short: "List links from object or bucket",
 	Long:  `List links from object or bucket`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("ls called")
+		//fmt.Println("ls called")
 
 		// 桶名称
 		bucketName := GetBucketName(args)

@@ -38,3 +38,6 @@ script_test
 testdata
 mytest.sh
 chainstorage-cli
+import_testscript.sh
+logs/
+uploading

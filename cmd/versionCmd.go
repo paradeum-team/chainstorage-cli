@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var versionCmd = &cobra.Command{
 	Short: "Show IPFS version information",
 	Long:  `Show IPFS version information`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("version called")
+		//fmt.Println("version called")
 		ipfsVersionRun(cmd, args)
 	},
 }

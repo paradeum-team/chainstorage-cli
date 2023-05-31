@@ -57,7 +57,7 @@ func bucketListRun(cmd *cobra.Command, args []string) {
 	// 查询偏移量
 	//offset := viper.GetInt("cli.listOffset")
 	offset := cliConfig.ListOffset
-	if pageSize > 0 || pageSize < 1000 {
+	if offset > 0 || offset <= 1000 {
 		pageSize = offset
 	}
 

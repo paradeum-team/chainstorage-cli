@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var rnCmd = &cobra.Command{
 	Short: "rename object",
 	Long:  `rename object`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("rn called")
+		//fmt.Println("rn called")
 		objectRenameRun(cmd, args)
 	},
 }

@@ -23,17 +23,33 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
 
 // logCmd represents the log command
 var logCmd = &cobra.Command{
-	Use:   "log",
+	Use:   "log <level>",
 	Short: "Manage and show logs of running daemon",
 	Long:  `Manage and show logs of running daemon`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("log called")
+		//fmt.Println("log called")
+		if len(args) == 0 {
+			cmd.Help()
+			os.Exit(0)
+		}
+
+		level := args[0]
+
+		err := setLogLevel(level)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "Error:%s\n", err.Error())
+			//cmd.Help()
+			os.Exit(1)
+		} else {
+			fmt.Fprintf(os.Stdout, "Changed log level to '%s'\n", level)
+		}
 	},
 }
 

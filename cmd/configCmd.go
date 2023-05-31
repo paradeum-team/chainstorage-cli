@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,8 @@ var configCmd = &cobra.Command{
 	Short: "Manage configuration",
 	Long:  `Manage configuration`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("config called")
+		//fmt.Println("config called")
+		configShowRun(cmd, args)
 	},
 }
 

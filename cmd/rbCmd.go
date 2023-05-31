@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var rbCmd = &cobra.Command{
 	Short: "remove bucket",
 	Long:  `remove bucket`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("rb called")
+		//fmt.Println("rb called")
 		bucketRemoveRun(cmd, args)
 	},
 }

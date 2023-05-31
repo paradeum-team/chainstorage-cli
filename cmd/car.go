@@ -212,14 +212,28 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string) (
 		return response, err
 	}
 
-	fileDestination := dataPath
+	carFileUploadReq := model.CarFileUploadReq{}
+	// 上传为目录的情况
+	if fileInfo.IsDir() {
+		notEmpty, err := isFolderNotEmpty(dataPath)
+		if err != nil {
+			log.WithError(err).WithField("dataPath", dataPath).Error("fail to check uploadiong folder")
+			return response, err
+		}
+
+		if !notEmpty {
+			return response, sdkcode.ErrCarUploadFileInvalidDataFolder
+		}
+
+		//if fileInfo.IsDir() || isCarFile {
+		carFileUploadReq.ObjectTypeCode = consts.ObjectTypeCodeDir
+	}
+
 	//if !isCarFile {
-	fileDestination = sdk.Car.GenerateTempFileName(utils.CurrentDate()+"_", ".tmp")
+	fileDestination := sdk.Car.GenerateTempFileName(utils.CurrentDate()+"_", ".tmp")
 	//fileDestination := GenerateTempFileName("", ".tmp")
-	// add constant
-	carVersion := 1
+	carVersion := sdkConfig.CarVersion
 	//log.Infof("UploadData carVersion:%d, fileDestination:%s, dataPath:%s\n", carVersion, fileDestination, dataPath)
-	//fmt.Printf("UploadData carVersion:%d, fileDestination:%s, dataPath:%s\n", carVersion, fileDestination, dataPath)
 
 	log.WithFields(logrus.Fields{
 		"fileDestination": fileDestination,
@@ -291,19 +305,12 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string) (
 	//}
 
 	// 设置请求参数
-	carFileUploadReq := model.CarFileUploadReq{}
 	carFileUploadReq.BucketId = bucketId
 	carFileUploadReq.ObjectCid = objectCid
 	carFileUploadReq.ObjectSize = objectSize
 	carFileUploadReq.ObjectName = objectName
 	carFileUploadReq.FileDestination = fileDestination
 	carFileUploadReq.CarFileCid = rootCid
-
-	// 上传为目录的情况
-	if fileInfo.IsDir() {
-		//if fileInfo.IsDir() || isCarFile {
-		carFileUploadReq.ObjectTypeCode = consts.ObjectTypeCodeDir
-	}
 
 	// 计算文件sha256
 	sha256, err := utils.GetFileSha256ByPath(fileDestination)
@@ -347,7 +354,13 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string) (
 	}
 
 	// CAR文件大小，超过分片阈值
-	carFileSize := fileInfo.Size()
+	carFileInfo, err := os.Stat(fileDestination)
+	if err != nil {
+		log.WithError(err).WithField("fileDestination", fileDestination).Error("fail to return stat of file")
+		return response, err
+	}
+
+	carFileSize := carFileInfo.Size()
 	carFileShardingThreshold := sdk.Config.CarFileShardingThreshold
 
 	// 生成CAR分片文件上传
@@ -367,15 +380,13 @@ func UploadData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string) (
 
 	// 普通上传
 	file, err := os.Open(fileDestination)
-	defer file.Close()
-	fi, err := file.Stat()
 	if err != nil {
 		log.WithError(err).WithField("fileDestination", fileDestination).Error("fail to return stat of file")
-		return response, sdkcode.ErrCarUploadFileFail
+		return response, err
 	}
-	size := fi.Size()
+	defer file.Close()
 
-	bar := pb.Start64(size).SetWriter(os.Stdout).Set(pb.Bytes, true)
+	bar := pb.Start64(carFileSize).SetWriter(os.Stdout).Set(pb.Bytes, true)
 	bar.SetRefreshRate(100 * time.Millisecond)
 	defer bar.Finish()
 
@@ -682,8 +693,8 @@ func carImportRunOutput(cmd *cobra.Command, args []string, resp model.ObjectCrea
 	//Error: This is not a carfile
 
 	templateContent := `
-CID: {{.ObjectCid}}
-Name: {{.ObjectName}}
+CID: {{.Data.ObjectCid}}
+Name: {{.Data.ObjectName}}
 `
 
 	t, err := template.New("carImportTemplate").Parse(templateContent)
@@ -816,15 +827,13 @@ func ImportData(sdk *chainstoragesdk.CssClient, bucketId int, dataPath string) (
 
 	// 普通上传
 	file, err := os.Open(fileDestination)
-	defer file.Close()
-	fi, err := file.Stat()
 	if err != nil {
 		log.WithError(err).WithField("fileDestination", fileDestination).Error("fail to return stat of file")
-		return response, sdkcode.ErrCarUploadFileFail
+		return response, err
 	}
-	size := fi.Size()
+	defer file.Close()
 
-	bar := pb.Start64(size).SetWriter(os.Stdout).Set(pb.Bytes, true)
+	bar := pb.Start64(carFileSize).SetWriter(os.Stdout).Set(pb.Bytes, true)
 	bar.SetRefreshRate(100 * time.Millisecond)
 	defer bar.Finish()
 

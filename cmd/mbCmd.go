@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var mbCmd = &cobra.Command{
 	Short: "create bucket",
 	Long:  `create bucket`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("mb called")
+		//fmt.Println("mb called")
 		bucketCreateRun(cmd, args)
 	},
 }
