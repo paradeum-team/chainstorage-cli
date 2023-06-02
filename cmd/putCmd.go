@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var putCmd = &cobra.Command{
 	Short: "upload file or folder",
 	Long:  `upload file or folder`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("put called")
+		//fmt.Println("put called")
 		carUploadRun(cmd, args)
 	},
 }

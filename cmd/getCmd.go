@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var getCmd = &cobra.Command{
 	Short: "get object",
 	Long:  `get object`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("get called")
+		//fmt.Println("get called")
 		objectDownloadRun(cmd, args)
 	},
 }

@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var importCmd = &cobra.Command{
 	Short: "import car file",
 	Long:  `import car file`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("import called")
+		//fmt.Println("import called")
 		carImportRun(cmd, args)
 	},
 }

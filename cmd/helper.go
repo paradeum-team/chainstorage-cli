@@ -1,16 +1,20 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func Error(cmd *cobra.Command, args []string, err error) {
+	log.Errorf("execute %s args:%v error:%v\n", cmd.Name(), args, err)
 	fmt.Fprintf(os.Stderr, "execute %s args:%v error:%v\n", cmd.Name(), args, err)
 	os.Exit(1)
 }
@@ -21,7 +25,8 @@ func GetBucketName(args []string) string {
 		return bucketName
 	}
 
-	bucketPrefix := viper.GetString("cmd.bucket_prefix")
+	//bucketPrefix := viper.GetString("cli.bucketPrefix")
+	bucketPrefix := cliConfig.BucketPrefix
 
 	for i := range args {
 		arg := args[i]
@@ -40,7 +45,8 @@ func GetDataPath(args []string) string {
 		return dataPath
 	}
 
-	bucketPrefix := viper.GetString("cmd.bucket_prefix")
+	//bucketPrefix := viper.GetString("cli.bucketPrefix")
+	bucketPrefix := cliConfig.BucketPrefix
 
 	for i := range args {
 		arg := args[i]
@@ -89,6 +95,96 @@ func checkObjectName(objectName string) error {
 
 	if objectName == "." || objectName == ".." {
 		return sdkcode.ErrInvalidObjectName
+	}
+
+	return nil
+}
+
+func GetTimestampString() string {
+	timestampString := time.Now().Format("2006-01-02 15:04:05.000000000") //当前时间的字符串，2006-01-02 15:04:05据说是golang的诞生时间，固定写法
+	return timestampString
+}
+
+func isFolderNotEmpty(path string) (bool, error) {
+	// Check if the path is a directory
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+
+	if !fileInfo.IsDir() {
+		return false, nil
+	}
+
+	// Open the directory
+	dir, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer dir.Close()
+
+	// Read the directory entries
+	_, err = dir.Readdirnames(1)
+	if err == nil {
+		// Directory is not empty
+		return true, nil
+	} else if err == io.EOF {
+		// Directory is empty
+		return false, nil
+	} else {
+		// An error occurred while reading the directory
+		return false, err
+	}
+}
+
+func getFolderSize(path string) (int64, error) {
+	var size int64
+
+	err := filepath.Walk(path, func(filePath string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !fileInfo.IsDir() {
+			size += fileInfo.Size()
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return size, nil
+}
+
+//func main() {
+//	path := "/path/to/folder"
+//
+//	size, err := folderSize(path)
+//	if err != nil {
+//		fmt.Printf("Error: %v\n", err)
+//		return
+//	}
+//
+//	fmt.Printf("Folder size: %d bytes\n", size)
+//}
+
+func printFileContent(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fmt.Fprintln(os.Stdout, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
 	}
 
 	return nil

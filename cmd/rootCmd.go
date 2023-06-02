@@ -23,13 +23,40 @@ package cmd
 
 import (
 	"fmt"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
+	"github.com/ulule/deepcopier"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
+var sdkCfgFile string
+var debug bool
+var cliConfig CliConfig
+var sdkConfig SdkConfig
+var loggerConfig LoggerConfig
+var appConfig chainstoragesdk.ApplicationConfig
+
+type PlainFormatter struct {
+}
+
+func (f *PlainFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return []byte(fmt.Sprintf("%s\n", entry.Message)), nil
+}
+
+func toggleDebug(cmd *cobra.Command, args []string) {
+	if debug {
+		logrus.Info("Debug logs enabled")
+		logrus.SetLevel(logrus.DebugLevel)
+		logrus.SetFormatter(&logrus.TextFormatter{})
+	} else {
+		plainFormatter := new(PlainFormatter)
+		logrus.SetFormatter(plainFormatter)
+	}
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -39,6 +66,7 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
+	//PreRun: toggleDebug,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -57,11 +85,13 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.toml)")
+	//rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.toml)")
+	//rootCmd.PersistentFlags().StringVar(&sdkCfgFile, "sdkConfig", "", "sdk config file (default is ./chainstorage-sdk.yaml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	//rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", true, "verbose logging")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -87,8 +117,37 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		// todo: remove it
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	if err := viper.ReadInConfig(); err != nil {
+		//fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+
+		// todo: exit cli, if config can't be found?
+		fmt.Fprintf(os.Stderr, "config file can't be found, error:%v\n", err)
+		os.Exit(1)
 	}
+
+	//cscConfig := CscConfig{}
+	//err := viper.UnmarshalExact(&cscConfig)
+	//if err != nil {
+	//	fmt.Fprintln(os.Stderr, "viper.UnmarshalExact, error:", err)
+	//}
+
+	cscConfig := CscConfig{}
+	err := viper.Unmarshal(&cscConfig)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "config Unmarshal fail, error:%+v\n", err)
+	}
+
+	cliConfig = cscConfig.Cli
+	sdkConfig = cscConfig.Sdk
+	loggerConfig = cscConfig.Logger
+
+	//fmt.Printf("Config struct: %#v\n", cscConfig)
+	//fmt.Printf("All configuration: %+v\n", viper.AllSettings())
+	appConfig = chainstoragesdk.ApplicationConfig{}
+
+	// 设置SDK配置
+	deepcopier.Copy(&sdkConfig).To(&appConfig.Server)
+	deepcopier.Copy(&loggerConfig).To(&appConfig.Logger)
+
+	initLogger()
 }

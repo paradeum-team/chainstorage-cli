@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -33,7 +32,7 @@ var lsCmd = &cobra.Command{
 	Short: "List links from object or bucket",
 	Long:  `List links from object or bucket`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("ls called")
+		//fmt.Println("ls called")
 
 		// 桶名称
 		bucketName := GetBucketName(args)
@@ -46,12 +45,12 @@ var lsCmd = &cobra.Command{
 		//fmt.Println("bucketName:" + bucketName)
 
 		//// 查询偏移量
-		//offset, err := cmd.Flags().GetInt("offset")
+		//offset, err := cli.Flags().GetInt("offset")
 		//if err != nil {
 		//	Error(cmd, args, err)
 		//}
 		//
-		//viperoffset := viper.GetInt("cmd.list_offset")
+		//viperoffset := viper.GetInt("cli.listOffset")
 		//
 		//fmt.Println("offset:" + strconv.Itoa(offset))
 		//fmt.Println("viperoffset:" + strconv.Itoa(viperoffset))
@@ -73,7 +72,7 @@ func init() {
 
 	// 查询偏移量
 	lsCmd.Flags().IntP("offset", "o", 10, "list offset")
-	viper.BindPFlag("cmd.list_offset", lsCmd.Flags().Lookup("offset"))
+	viper.BindPFlag("cli.listOffset", lsCmd.Flags().Lookup("offset"))
 
 	// 对象名称
 	lsCmd.Flags().StringP("name", "n", "", "name of object")

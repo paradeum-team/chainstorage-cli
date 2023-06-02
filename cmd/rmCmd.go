@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +31,7 @@ var rmCmd = &cobra.Command{
 	Short: "empty bucket",
 	Long:  `empty bucket`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("rm called")
+		//fmt.Println("rm called")
 
 		// 对象名称
 		objectName, err := cmd.Flags().GetString("name")
