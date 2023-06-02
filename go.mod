@@ -3,7 +3,11 @@ module github.com/paradeum-team/chainstorage-cli
 go 1.20
 
 require (
+	github.com/alanshaw/go-carbites v0.6.0
+	github.com/ipfs/go-cid v0.4.1
+	github.com/lestrrat-go/file-rotatelogs v2.3.0+incompatible
 	github.com/pkg/errors v0.9.1
+	github.com/sirupsen/logrus v1.9.2
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	github.com/ulule/deepcopier v0.0.0-20200430083143-45decc6639b6
@@ -13,7 +17,6 @@ require (
 	github.com/Code-Hex/updater v0.0.0-20160712085121-c3f278672520 // indirect
 	github.com/Songmu/prompter v0.5.0 // indirect
 	github.com/VividCortex/ewma v1.1.1 // indirect
-	github.com/alanshaw/go-carbites v0.6.0 // indirect
 	github.com/antonholmquist/jason v1.0.1-0.20160829104012-962e09b85496 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20161001163130-7b3beb6df3c4 // indirect
 	github.com/fatih/color v1.13.0 // indirect
@@ -31,7 +34,6 @@ require (
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-block-format v0.1.2 // indirect
 	github.com/ipfs/go-blockservice v0.5.0 // indirect
-	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
 	github.com/ipfs/go-ipfs-blockstore v1.3.0 // indirect
 	github.com/ipfs/go-ipfs-chunker v0.0.5 // indirect
@@ -56,7 +58,6 @@ require (
 	github.com/kataras/golog v0.0.18 // indirect
 	github.com/kataras/pio v0.0.8 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
-	github.com/lestrrat-go/file-rotatelogs v2.3.0+incompatible // indirect
 	github.com/lestrrat-go/strftime v1.0.1 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-msgio v0.3.0 // indirect
@@ -80,7 +81,6 @@ require (
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/sirupsen/logrus v1.9.2 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
@@ -115,7 +115,8 @@ replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.11.0
 require (
 	github.com/Code-Hex/pget v0.1.1
 	github.com/cheggaaa/pb/v3 v3.0.8
-	github.com/paradeum-team/chainstorage-sdk/sdk v0.0.0-20230522083708-3022df5c4d3c
+	//github.com/paradeum-team/chainstorage-sdk/sdk v0.0.0-20230522083708-3022df5c4d3c
+	github.com/paradeum-team/chainstorage-sdk/sdk v0.0.0-20230602073419-e284c7334c5f
 )
 
-replace github.com/paradeum-team/chainstorage-sdk/sdk => /Users/yuan/code/chainstorage-sdk/sdk
+//replace github.com/paradeum-team/chainstorage-sdk/sdk => /Users/yuan/code/chainstorage-sdk/sdk
