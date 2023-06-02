@@ -26,3 +26,4 @@ testdata
 logs/
 /uploading/*
 /testserver/*
+/testserver
