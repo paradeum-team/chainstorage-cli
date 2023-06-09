@@ -31,8 +31,8 @@ import (
 // logCmd represents the log command
 var logCmd = &cobra.Command{
 	Use:   "log <level>",
-	Short: "Manage and show logs of running daemon",
-	Long:  `Manage and show logs of running daemon`,
+	Short: "Manage and show logs. Supported level of log are: trace, debug, info, warn and error their lower-case forms",
+	Long:  `Manage and show logs. Supported level of log are: trace, debug, info, warn and error their lower-case forms`,
 	Run: func(cmd *cobra.Command, args []string) {
 		//fmt.Println("log called")
 		if len(args) == 0 {

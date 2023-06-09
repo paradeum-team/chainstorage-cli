@@ -1,7 +1,6 @@
 [cli]
 ipfsGateway = "chainstorage-gateway.solarfs.io/ipfs/"
-ggcscmdPath = ''
-useHttpsProtocol = "https"
+useHttpsProtocol = true
 bucketPrefix = 'cs://'
 listOffset = 20
 cleanTmpData = true
@@ -11,17 +10,11 @@ retryDelay = 3
 [sdk]
 defaultRegion = 'hk-1'
 timeZone = 'UTC +08:00'
-#链存服务API地址
 chainStorageApiEndpoint = 'chainstorage-api.solarfs.io'
-#CAR文件工作目录
+useHttpsProtocol = true
 carFileWorkPath = './tmp/carfile'
-#CAR文件分片阈值
-carFileShardingThreshold = 1048576
-#链存服务API token
 chainStorageApiToken = ''
-#HTTP request user agent (K2请求需要)
 httpRequestUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
-#HTTP request overtime
 httpRequestOvertime = 30
 carVersion = 1
 

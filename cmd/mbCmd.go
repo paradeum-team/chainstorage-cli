@@ -27,7 +27,7 @@ import (
 
 // mbCmd represents the mb command
 var mbCmd = &cobra.Command{
-	Use:   "mb cs://[BUCKET] [--storageNetworkCode=<storageNetworkCode>] [--bucketPrincipleCode=<bucketPrincipleCode>]",
+	Use:   "mb cs://<BUCKET> [--storageNetworkCode=<storageNetworkCode>] [--bucketPrincipleCode=<bucketPrincipleCode>]",
 	Short: "create bucket",
 	Long:  `create bucket`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -48,6 +48,6 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// mbCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	mbCmd.Flags().IntP("storageNetworkCode", "s", 10001, "storage network code")
-	mbCmd.Flags().IntP("bucketPrincipleCode", "b", 10001, "bucket principle code")
+	mbCmd.Flags().IntP("storageNetworkCode", "s", 10001, "storage network code. option value: 10001-IPFS")
+	mbCmd.Flags().IntP("bucketPrincipleCode", "b", 10001, "bucket principle code. option value: 10001-public,10000-private")
 }

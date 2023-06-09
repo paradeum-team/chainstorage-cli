@@ -39,7 +39,13 @@ var rmCmd = &cobra.Command{
 			Error(cmd, args, err)
 		}
 
-		if len(objectName) == 0 {
+		// 对象CID
+		objectCid, err := cmd.Flags().GetString("cid")
+		if err != nil {
+			Error(cmd, args, err)
+		}
+
+		if len(objectName) == 0 && len(objectCid) == 0 {
 			bucketEmptyRun(cmd, args)
 		} else {
 			objectRemoveRun(cmd, args)

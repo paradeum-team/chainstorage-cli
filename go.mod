@@ -115,8 +115,7 @@ replace github.com/go-resty/resty => gopkg.in/resty.v1 v1.11.0
 require (
 	github.com/Code-Hex/pget v0.1.1
 	github.com/cheggaaa/pb/v3 v3.0.8
-	//github.com/paradeum-team/chainstorage-sdk/sdk v0.0.0-20230522083708-3022df5c4d3c
-	github.com/paradeum-team/chainstorage-sdk/sdk v0.0.0-20230606085429-eeaa8c4e8d0a
+	github.com/paradeum-team/chainstorage-sdk v0.0.6
 )
 
-//replace github.com/paradeum-team/chainstorage-sdk/sdk => /Users/yuan/code/chainstorage-sdk/sdk
+//replace github.com/paradeum-team/chainstorage-sdk => /Users/yuan/code/chainstorage-sdk

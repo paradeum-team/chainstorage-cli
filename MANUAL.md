@@ -1,4 +1,4 @@
-# Manual
+# Chainstorage-cli Manual
 
 ## Introduction
 - chainstorage-cli is the command line application to interact with rest api SDK of *chain strorage*.
@@ -400,8 +400,7 @@ Here is an example of a configuration file (`config.toml`) with available option
 ```
 [cli]
 ipfsGateway = "test-ipfs-gateway.netwarps.com/ipfs/"
-ggcscmdPath = '/path/to/ggcscmd'
-useHttpsProtocol = "https"
+useHttpsProtocol = true
 bucketPrefix = 'cs://'
 listOffset = 20
 cleanTmpData = true
@@ -411,17 +410,12 @@ retryDelay = 3
 [sdk]
 defaultRegion = 'hk-1'
 timeZone = 'UTC +08:00'
-#链存服务API地址
 chainStorageApiEndpoint = 'http://127.0.0.1:8821'
-#CAR文件工作目录
+useHttpsProtocol = true
 carFileWorkPath = './tmp/carfile'
-#CAR文件分片阈值()
-carFileShardingThreshold = 1048576
-#链存服务API token
+carFileShardingThreshold = 46137344
 chainStorageApiToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-#HTTP request user agent (K2请求需要)
 httpRequestUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
-#HTTP request overtime
 httpRequestOvertime = 30
 carVersion = 1
 
@@ -448,17 +442,11 @@ The CLI configuration allows you to specify various settings related to the tool
 - Type: String
 - Default Value: `test-ipfs-gateway.netwarps.com/ipfs/`
 
-#### ggcscmdPath
-
-- Description: The path to the `ggcscmd` executable.
-- Type: String
-- Default Value: `/path/to/ggcscmd`
-
 #### useHttpsProtocol
 
 - Description: Indicates whether to use HTTPS protocol.
-- Type: String
-- Default Value: `https`
+- Type: Boolean
+- Default Value: `true`
 
 #### bucketPrefix
 
@@ -514,6 +502,12 @@ The SDK configuration allows you to specify various settings related to the SDK'
 - Type: String
 - Default Value: `http://127.0.0.1:8821`
 
+#### useHttpsProtocol
+
+- Description: Indicates whether to use HTTPS protocol.
+- Type: Boolean
+- Default Value: `true`
+
 #### carFileWorkPath
 
 - Description: The working directory for CAR files.
@@ -524,7 +518,7 @@ The SDK configuration allows you to specify various settings related to the SDK'
 
 - Description: The threshold (in bytes) for CAR file sharding.
 - Type: Integer
-- Default Value: `1048576`
+- Default Value: `46137344`
 
 #### chainStorageApiToken
 

@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"fmt"
-	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
-	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
-	"github.com/paradeum-team/chainstorage-sdk/sdk/consts"
-	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
+	"github.com/paradeum-team/chainstorage-sdk/consts"
+	"github.com/paradeum-team/chainstorage-sdk/model"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/ulule/deepcopier"
@@ -102,11 +101,18 @@ func bucketListRunOutput(cmd *cobra.Command, args []string, resp model.BucketPag
 			// 存储网络
 			bucketOutput.StorageNetwork = consts.StorageNetworkCodeMapping[bucketOutput.StorageNetworkCode]
 
-			// 桶策略
-			bucketOutput.BucketPrinciple = consts.BucketPrincipleCodeMapping[bucketOutput.BucketPrincipleCode]
+			//// 桶策略
+			//bucketOutput.BucketPrinciple = consts.BucketPrincipleCodeMapping[bucketOutput.BucketPrincipleCode]
+
+			// 桶策略（英文）
+			bucketOutput.BucketPrinciple = consts.BucketPrincipleCodeMappingEn[bucketOutput.BucketPrincipleCode]
 
 			// 创建时间
 			bucketOutput.CreatedDate = bucketOutput.CreatedAt.Format("2006-01-02")
+
+			// 已使用空间
+			bucketOutput.FormatUsedSpace = convertSizeUnit(bucketOutput.UsedSpace)
+
 			bucketListOutput.List = append(bucketListOutput.List, bucketOutput)
 		}
 	}
@@ -117,7 +123,7 @@ total {{.Count}}
 Status: {{.Code}}
 {{- else}}
 {{- range .List}}
-{{.ObjectAmount}} {{.StorageNetwork}} {{.BucketPrinciple}} {{.UsedSpace}} {{.CreatedDate}} {{.BucketName}}
+{{.StorageNetwork}} {{.BucketPrinciple}} {{.FormatUsedSpace}} {{.ObjectAmount}} {{.CreatedDate}} {{.BucketName}}
 {{- end}}
 {{- end}}
 `
@@ -155,6 +161,7 @@ type BucketOutput struct {
 	StorageNetwork      string    `json:"storageNetwork" comment:"存储网络（10001-IPFS）"`
 	BucketPrinciple     string    `json:"bucketPrinciple" comment:"桶策略（10001-公开，10000-私有）"`
 	CreatedDate         string    `json:"createdDate" comment:"创建日期"`
+	FormatUsedSpace     string    `json:"formatUsedSpace" comment:"格式化已使用空间"`
 }
 
 // endregion Bucket List
@@ -245,8 +252,11 @@ func bucketCreateRunOutput(cmd *cobra.Command, args []string, resp model.BucketC
 	// 存储网络
 	bucketOutput.StorageNetwork = consts.StorageNetworkCodeMapping[bucketOutput.StorageNetworkCode]
 
-	// 桶策略
-	bucketOutput.BucketPrinciple = consts.BucketPrincipleCodeMapping[bucketOutput.BucketPrincipleCode]
+	//// 桶策略
+	//bucketOutput.BucketPrinciple = consts.BucketPrincipleCodeMapping[bucketOutput.BucketPrincipleCode]
+
+	// 桶策略（英文）
+	bucketOutput.BucketPrinciple = consts.BucketPrincipleCodeMappingEn[bucketOutput.BucketPrincipleCode]
 
 	// 创建时间 todo: timezone
 	//bucketOutput.CreatedDate = bucketOutput.CreatedAt.Format("2006-01-02")
@@ -406,10 +416,10 @@ func bucketEmptyRun(cmd *cobra.Command, args []string) {
 	}
 
 	// todo: remove it
-	fmt.Sprint(force)
-	//if !force {
-	//	Error(cmd, args, errors.New("empty bucket operation, add --force to confirm emptying"))
-	//}
+	//fmt.Sprint(force)
+	if !force {
+		Error(cmd, args, errors.New("empty bucket operation, add --force to confirm emptying"))
+	}
 
 	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {

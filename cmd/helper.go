@@ -3,7 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
 	"github.com/spf13/cobra"
 	"io"
 	"os"
@@ -188,4 +188,23 @@ func printFileContent(filename string) error {
 	}
 
 	return nil
+}
+
+func convertSizeUnit(size int64) string {
+	// 2^10 = 1024
+	const unit = 1024
+	if size < unit {
+		return fmt.Sprintf("%dB", size)
+	}
+
+	div, exp := int64(unit), 0
+	for size >= div && exp < 8 {
+		div *= unit
+		exp++
+	}
+
+	convertedSize := float64(size) / float64(div/unit)
+	//fmt.Printf("size:%d\n", size)
+	//fmt.Printf("div:%d\n", div)
+	return fmt.Sprintf("%.1f%cB", convertedSize, "KMGTPEZY"[exp-1])
 }

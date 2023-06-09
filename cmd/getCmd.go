@@ -54,4 +54,7 @@ func init() {
 
 	// 对象CID
 	getCmd.Flags().StringP("cid", "c", "", "cid of object")
+
+	// 用户自定义目录
+	getCmd.Flags().StringP("downloadFolder", "d", "", "download folder")
 }
