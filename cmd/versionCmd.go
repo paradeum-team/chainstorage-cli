@@ -32,7 +32,7 @@ var versionCmd = &cobra.Command{
 	Long:  `Show IPFS version information`,
 	Run: func(cmd *cobra.Command, args []string) {
 		//fmt.Println("version called")
-		ipfsVersionRun(cmd, args)
+		versionRun(cmd, args)
 	},
 }
 

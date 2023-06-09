@@ -28,9 +28,23 @@ import (
 
 // lsCmd represents the ls command
 var lsCmd = &cobra.Command{
-	Use:   "ls [--Offset=<Offset>]",
+	Use:   "ls [cs://<BUCKET>] [--name=<name>] [--cid=<cid>] [--Offset=<Offset>]",
 	Short: "List links from object or bucket",
-	Long:  `List links from object or bucket`,
+	Long: `List links from object or bucket
+Example
+
+To list all buckets, use the following command:
+gcscmd ls --offset <offset>
+Replace <offset> with the desired list offset value.
+
+To list links from an object or bucket, use the following command:
+gcscmd ls cs://<BUCKET> --cid <cid> --offset <offset>
+Replace <BUCKET> with the name of the bucket, <cid> with the CID of the object, and <offset> with the desired list offset value.
+
+Alternatively, you can specify the object name using the --name flag:
+gcscmd ls cs://<BUCKET> --name <name> --offset <offset>
+Replace <name> with the name of the object and <offset> with the desired list offset value.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		//fmt.Println("ls called")
 

@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"github.com/Code-Hex/pget"
 	"github.com/ipfs/go-cid"
-	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
-	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
-	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
+	"github.com/paradeum-team/chainstorage-sdk/consts"
+	"github.com/paradeum-team/chainstorage-sdk/model"
+	"github.com/paradeum-team/chainstorage-sdk/utils"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/ulule/deepcopier"
 	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"text/template"
 	"time"
 )
@@ -164,6 +169,10 @@ func objectListRunOutput(cmd *cobra.Command, args []string, resp model.ObjectPag
 
 			// 创建时间
 			objectOutput.CreatedDate = objectOutput.CreatedAt.Format("2006-01-02")
+
+			// 对象大小
+			objectOutput.FormatObjectSize = convertSizeUnit(objectOutput.ObjectSize)
+
 			objectListOutput.List = append(objectListOutput.List, objectOutput)
 		}
 	}
@@ -174,7 +183,7 @@ total {{.Count}}
 Status: {{.Code}}
 {{else}}
 {{- range .List}}
-{{.ObjectCid}} {{.ObjectSize}} {{.CreatedDate}} {{.ObjectName}}
+{{.ObjectCid}} {{.FormatObjectSize}} {{.CreatedDate}} {{.ObjectName}}
 {{- end}}
 {{end}}`
 
@@ -201,16 +210,17 @@ type ObjectListOutput struct {
 }
 
 type ObjectOutput struct {
-	Id             int       `json:"id" comment:"对象ID"`
-	BucketId       int       `json:"bucketId" comment:"桶主键"`
-	ObjectName     string    `json:"objectName" comment:"对象名称（255字限制）"`
-	ObjectTypeCode int       `json:"objectTypeCode" comment:"对象类型编码"`
-	ObjectSize     int64     `json:"objectSize" comment:"对象大小（字节）"`
-	IsMarked       int       `json:"isMarked" comment:"星标（1-已标记，0-未标记）"`
-	ObjectCid      string    `json:"objectCid" comment:"对象CID"`
-	CreatedAt      time.Time `json:"createdAt" comment:"创建时间"`
-	UpdatedAt      time.Time `json:"updatedAt" comment:"最后更新时间"`
-	CreatedDate    string    `json:"createdDate" comment:"创建日期"`
+	Id               int       `json:"id" comment:"对象ID"`
+	BucketId         int       `json:"bucketId" comment:"桶主键"`
+	ObjectName       string    `json:"objectName" comment:"对象名称（255字限制）"`
+	ObjectTypeCode   int       `json:"objectTypeCode" comment:"对象类型编码"`
+	ObjectSize       int64     `json:"objectSize" comment:"对象大小（字节）"`
+	IsMarked         int       `json:"isMarked" comment:"星标（1-已标记，0-未标记）"`
+	ObjectCid        string    `json:"objectCid" comment:"对象CID"`
+	CreatedAt        time.Time `json:"createdAt" comment:"创建时间"`
+	UpdatedAt        time.Time `json:"updatedAt" comment:"最后更新时间"`
+	CreatedDate      string    `json:"createdDate" comment:"创建日期"`
+	FormatObjectSize string    `json:"formatObjectSize" comment:"格式化对象大小"`
 }
 
 // endregion Object List
@@ -274,10 +284,10 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, err)
 	}
 
-	// todo: return succeed?
-	if rename == objectName {
-		Error(cmd, args, errors.New("the new name of object can't be equal to the raw name of object"))
-	}
+	//// todo: return succeed?
+	//if rename == objectName {
+	//	Error(cmd, args, errors.New("the new name of object can't be equal to the raw name of object"))
+	//}
 
 	// 强制覆盖
 	force, err := cmd.Flags().GetBool("force")
@@ -322,12 +332,15 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 
 		count := respObject.Data.Count
 		if count == 1 {
-			objectId = respObject.Data.List[0].Id
+			objectData := respObject.Data.List[0]
+			objectId = objectData.Id
+			objectName = objectData.ObjectName
 		} else if count == 0 {
 			Error(cmd, args, sdkcode.ErrObjectNotFound)
 		} else if count > 1 {
 			// todo: please use name query?
-			Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use cid query\n"))
+			//Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use cid query\n"))
+			Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use name query\n"))
 		}
 	} else {
 		respObject, err := sdk.Object.GetObjectByName(bucketId, objectName)
@@ -344,10 +357,17 @@ func objectRenameRun(cmd *cobra.Command, args []string) {
 		objectId = respObject.Data.Id
 	}
 
-	// 重命名对象
-	response, err := sdk.Object.RenameObject(objectId, rename, force)
-	if err != nil {
-		Error(cmd, args, err)
+	response := model.ObjectRenameResponse{}
+	// 重名名与对象名称相同，直接返回成功
+	if rename == objectName {
+		response.Code = http.StatusOK
+		//Error(cmd, args, errors.New("the new name of object can't be equal to the raw name of object"))
+	} else {
+		// 重命名对象
+		response, err = sdk.Object.RenameObject(objectId, rename, force)
+		if err != nil {
+			Error(cmd, args, err)
+		}
 	}
 
 	objectRenameRunOutput(cmd, args, response)
@@ -658,11 +678,23 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 		Error(cmd, args, errors.New("please specify the name or cid"))
 	}
 
-	//// 输出路径
-	//target, err := cmd.Flags().GetString("Target")
-	//if err != nil {
-	//	Error(cmd, args, err)
-	//}
+	// 用户自定义目录
+	downloadFolder, err := cmd.Flags().GetString("downloadFolder")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	// 用户自定义目录无效
+	if len(downloadFolder) != 0 {
+		fileInfo, err := os.Stat(downloadFolder)
+		if err != nil {
+			Error(cmd, args, errors.New("please specify the valid download folder"))
+		}
+
+		if !fileInfo.IsDir() {
+			Error(cmd, args, errors.New("please specify the valid download folder"))
+		}
+	}
 
 	sdk, err := chainstoragesdk.New(&appConfig)
 	if err != nil {
@@ -704,7 +736,8 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 			Error(cmd, args, sdkcode.ErrObjectNotFound)
 		} else if count > 1 {
 			// todo: please use name query?
-			Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use cid query\n"))
+			//Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use cid query\n"))
+			Error(cmd, args, errors.New("Error: Multiple objects match this query, cannot perform this operation, please use name query\n"))
 		}
 
 		objectData := respObjectList.Data.List[0]
@@ -729,14 +762,27 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 		objectCid = respObject.Data.ObjectCid
 	}
 
+	isFolder := respObject.Data.ObjectTypeCode == consts.ObjectTypeCodeDir
+	if isFolder {
+		downloadFolderData(cmd, args, &respObject)
+		return
+	}
+
 	//ipfsGateway := viper.GetString("cli.ipfsGateway")
-	ipfsGateway := cliConfig.IpfsGateway
-	downloadUrl := fmt.Sprintf("https://%s%s", ipfsGateway, objectCid)
+	//downloadUrl := fmt.Sprintf("https://%s%s", ipfsGateway, objectCid)
+	//downloadUrl := fmt.Sprintf(ipfsGateway, objectCid)
+	//ipfsGateway := cliConfig.IpfsGateway
+	//downloadUrl := ipfsGateway + objectCid
+
+	downloadUrl := generateDownloadUrl(objectCid, false)
+	outputPath := objectName
+	if len(downloadFolder) != 0 {
+		outputPath = filepath.Join(downloadFolder, objectName)
+	}
 
 	cli := pget.New()
 	cli.URLs = []string{downloadUrl}
-	cli.Output = objectName
-
+	cli.Output = outputPath
 	version := ""
 	downloadArgs := []string{"-t", "10"}
 	if err := cli.Run(context.Background(), version, downloadArgs); err != nil {
@@ -794,4 +840,104 @@ type ObjectDownloadOutput struct {
 	Data      ObjectOutput `json:"objectOutput,omitempty"`
 }
 
+func downloadFolderData(cmd *cobra.Command, args []string, respObject *model.ObjectCreateResponse) {
+	objectCid := respObject.Data.ObjectCid
+	objectName := respObject.Data.ObjectName
+	downloadUrl := generateDownloadUrl(objectCid, true)
+
+	sdk, err := chainstoragesdk.New(&appConfig)
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	outputPath := sdk.Car.GenerateTempFileName(utils.CurrentDate()+"_", ".tmp")
+	cli := pget.New()
+	cli.URLs = []string{downloadUrl}
+	cli.Output = outputPath
+	version := ""
+	downloadArgs := []string{"-t", "10"}
+	if err := cli.Run(context.Background(), version, downloadArgs); err != nil {
+		//if cli.Trace {
+		//	fmt.Fprintf(os.Stderr, "Error:\n%+v\n", err)
+		//} else {
+		//	fmt.Fprintf(os.Stderr, "Error:\n  %v\n", err)
+		//}
+		Error(cmd, args, err)
+	}
+
+	// 用户自定义目录
+	downloadFolder, err := cmd.Flags().GetString("downloadfolder")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	// make data folder
+	folderDestination := objectName
+	if len(downloadFolder) != 0 {
+		folderDestination = filepath.Join(downloadFolder, objectName)
+	}
+
+	// Check if the folder exists
+	if _, err := os.Stat(folderDestination); os.IsNotExist(err) {
+		// Folder does not exist, create a new folder
+		err := os.MkdirAll(folderDestination, 0755)
+		if err != nil {
+			fmt.Println("Failed to create folder:", err)
+			Error(cmd, args, err)
+		}
+
+		fmt.Println("Folder created:", folderDestination)
+	}
+
+	// extract car, delete temp car, override file
+	err = sdk.Car.ExtractCarFile(outputPath, folderDestination)
+	if err != nil {
+		Error(cmd, args, err)
+	}
+	defer func(fileDestination string) {
+		//if !viper.GetBool("cli.cleanTmpData") {
+		if !cliConfig.CleanTmpData {
+			return
+		}
+
+		err := os.Remove(fileDestination)
+		if err != nil {
+			log.WithError(err).
+				WithFields(logrus.Fields{
+					"fileDestination": fileDestination,
+				}).Error("Fail to remove car file")
+			//fmt.Printf("Error:%+v\n", err)
+		}
+	}(outputPath)
+
+	objectDownloadRunOutput(cmd, args, *respObject)
+}
+
 // endregion Object Download
+
+func generateDownloadUrl(objectCid string, isFolder bool) string {
+	downloadUrl := ""
+
+	ipfsGateway := cliConfig.IpfsGateway
+	base, err := url.Parse(ipfsGateway)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ref, err := url.Parse(objectCid)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if isFolder {
+		queryString := ref.Query()
+		queryString.Set("format", "car")
+		ref.RawQuery = queryString.Encode()
+	}
+
+	u := base.ResolveReference(ref)
+	downloadUrl = u.String()
+	//fmt.Println(downloadUrl)
+
+	return downloadUrl
+}

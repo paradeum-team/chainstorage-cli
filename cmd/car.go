@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/alanshaw/go-carbites"
 	"github.com/cheggaaa/pb/v3"
-	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk/sdk"
-	sdkcode "github.com/paradeum-team/chainstorage-sdk/sdk/code"
-	"github.com/paradeum-team/chainstorage-sdk/sdk/consts"
-	"github.com/paradeum-team/chainstorage-sdk/sdk/model"
-	"github.com/paradeum-team/chainstorage-sdk/sdk/utils"
+	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk"
+	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
+	"github.com/paradeum-team/chainstorage-sdk/consts"
+	"github.com/paradeum-team/chainstorage-sdk/model"
+	"github.com/paradeum-team/chainstorage-sdk/utils"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -116,49 +116,6 @@ func carUploadRunOutput(cmd *cobra.Command, args []string, resp model.ObjectCrea
 	if err != nil {
 		Error(cmd, args, err)
 	}
-
-	//对象上传
-	//通过命令向固定桶内上传对象，包括文件、目录
-	//
-	//模版
-	//
-	//gcscmd put FILE[/DIR...] cs://BUCKET
-	//BUCKET
-	//
-	//桶名称
-	//
-	//命令行例子
-	//
-	//上传文件
-	//
-	//当前目录
-	//
-	//gcscmd put ./aaa.mp4 cs://bbb
-	//绝对路径
-	//
-	//gcscmd put /home/pz/aaa.mp4 cs://bbb
-	//相对路径
-	//
-	//gcscmd put ../pz/aaa.mp4 cs://bbb
-	//上传目录
-	//
-	//gcscmd put ./aaaa cs://bbb
-	//上传 carfile
-	//
-	//gcscmd put ./aaa.car cs://bbb --carfile
-	//响应
-	//
-	//过程
-	//
-	//################                                                                15%
-	//Tarkov.mp4
-	//完成
-	//
-	//CID:    QmWgnG7pPjG31w328hZyALQ2BgW5aQrZyKpT47jVpn8CNo
-	//Name:Tarkov.mp4
-	//报错
-	//
-	//Error: This file is a car file, add --carfile to confirm uploading car
 
 	templateContent := `
 CID: {{.Data.ObjectCid}}
@@ -507,7 +464,7 @@ func UploadBigCarFile(sdk *chainstoragesdk.CssClient, req *model.CarFileUploadRe
 				"index":        i,
 				"retry":        j,
 			}).Info("upload sharding car file")
-			fmt.Printf("UploadBigCarFile => UploadShardingCarFileExt, index:%d, parameter uploadingReq:%+v\n", i, uploadingReq)
+			//fmt.Printf("UploadBigCarFile => UploadShardingCarFileExt, index:%d, parameter uploadingReq:%+v\n", i, uploadingReq)
 			uploadResp, err := sdk.Car.UploadShardingCarFileExt(&uploadingReq, extReader)
 			if err == nil && uploadResp.Code == http.StatusOK {
 				uploadRespList = append(uploadRespList, uploadResp)
@@ -597,8 +554,9 @@ func carImportRun(cmd *cobra.Command, args []string) {
 
 	// CAR文件类型检查
 	if !strings.HasSuffix(strings.ToLower(dataPath), ".car") {
-		err := sdkcode.ErrCarUploadFileInvalidDataPath
-		Error(cmd, args, err)
+		//err := sdkcode.ErrCarUploadFileInvalidDataPath
+		//Error(cmd, args, err)
+		Error(cmd, args, errors.New("please specify car format file with .car suffix"))
 	}
 
 	//// CAR文件标识
