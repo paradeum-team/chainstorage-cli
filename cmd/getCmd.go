@@ -27,7 +27,7 @@ import (
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
-	Use:   "get cs://BUCKET [--name=<name>] [--cid=<cid>]",
+	Use:   "get cs://BUCKET [--name=<name>] [--cid=<cid>] [--downloadfolder=<downloadfolder>]",
 	Short: "get object",
 	Long:  `get object`,
 	Run: func(cmd *cobra.Command, args []string) {

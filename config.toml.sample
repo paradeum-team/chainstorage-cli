@@ -2,7 +2,7 @@
 ipfsGateway = "chainstorage-gateway.solarfs.io/ipfs/"
 useHttpsProtocol = true
 bucketPrefix = 'cs://'
-listOffset = 20
+listOffset = 10
 cleanTmpData = true
 maxRetries = 3
 retryDelay = 3

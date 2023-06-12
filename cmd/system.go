@@ -5,6 +5,7 @@ import (
 	"github.com/paradeum-team/chainstorage-sdk/model"
 	"github.com/spf13/cobra"
 	"os"
+	"strings"
 	"text/template"
 )
 
@@ -52,14 +53,30 @@ func versionRun(cmd *cobra.Command, args []string) {
 
 func versionRunOutput(cmd *cobra.Command, args []string, versionInfo *VersionInfo) {
 	templateContent := `
-Client Version: version.Info{Version:"v{{.Version}}"}
-Server Version: version.Info{Version:"v{{.ApiVersion}}"}
+Client Version: version.Info{Version:"{{.Version}}"}
+Server Version: version.Info{Version:"{{.ApiVersion}}"}
 `
 
 	t, err := template.New("versionTemplate").Parse(templateContent)
 	if err != nil {
 		Error(cmd, args, err)
 	}
+
+	clientVersion := versionInfo.Version
+	clientVersion = strings.ToLower(clientVersion)
+	if !strings.HasPrefix(clientVersion, "v") {
+		clientVersion = "v" + clientVersion
+	}
+	versionInfo.Version = clientVersion
+
+	apiVersion := versionInfo.ApiVersion
+	apiVersion = strings.ToLower(apiVersion)
+	if !strings.HasPrefix(apiVersion, "v") && apiVersion != "latest" {
+		apiVersion = "v" + apiVersion
+	}
+	apiVersion = strings.TrimSuffix(apiVersion, "\r")
+	apiVersion = strings.TrimSuffix(apiVersion, "\n")
+	versionInfo.ApiVersion = apiVersion
 
 	err = t.Execute(os.Stdout, versionInfo)
 	if err != nil {

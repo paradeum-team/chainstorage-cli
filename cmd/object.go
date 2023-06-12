@@ -508,10 +508,12 @@ func objectRemoveRun(cmd *cobra.Command, args []string) {
 
 	count := respObjectList.Data.Count
 	if count == 1 {
-		// todo：模糊匹配还是精准匹配?
-		rawObjectName := respObjectList.Data.List[0].ObjectName
-		if !force && rawObjectName != objectName {
-			Error(cmd, args, sdkcode.ErrObjectNotFound)
+		if len(objectName) != 0 {
+			// todo：模糊匹配还是精准匹配?
+			rawObjectName := respObjectList.Data.List[0].ObjectName
+			if !force && rawObjectName != objectName {
+				Error(cmd, args, sdkcode.ErrObjectNotFound)
+			}
 		}
 
 		objectId := respObjectList.Data.List[0].Id
