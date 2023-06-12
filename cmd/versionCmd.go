@@ -28,8 +28,8 @@ import (
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Show IPFS version information",
-	Long:  `Show IPFS version information`,
+	Short: "Show gcscmd version information",
+	Long:  `Show gcscmd version information`,
 	Run: func(cmd *cobra.Command, args []string) {
 		//fmt.Println("version called")
 		versionRun(cmd, args)

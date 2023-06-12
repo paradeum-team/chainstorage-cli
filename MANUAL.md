@@ -68,7 +68,7 @@ gcscmd config
 The `get` command allows you to retrieve an object from the system. Use the following syntax:
 
 ```shell
-gcscmd get cs://<BUCKET> [--name=<name>] [--cid=<cid>]
+gcscmd get cs://<BUCKET> [--name=<name>] [--cid=<cid>] [--downloadfolder=<downloadfolder>] [flags]
 ```
 
 Replace `<BUCKET>` with the name of the bucket where the object is located. You can optionally specify the name or CID of the object using the `--name` or `--cid` flags, respectively.
@@ -77,6 +77,7 @@ Replace `<BUCKET>` with the name of the bucket where the object is located. You 
 
 - `-c, --cid <cid>`: The CID of the object you want to retrieve.
 - `-n, --name <name>`: The name of the object you want to retrieve.
+- `-d, --downloadfolder <downloadfolder>`: The folder of download.
 
 #### Example
 
@@ -142,7 +143,8 @@ To manage and show logs of the running daemon, use the following command:
 gcscmd log <level>
 ```
 
-Replace `<level>` with the desired log level, such as `debug`, `info`, `warn`, or `error`.
+Replace `<level>` with the desired log level, such as `trace`, `debug`, `info`, `warn`, or `error`.
+
 
 This command will manage and display logs of the specified log level.
 
@@ -597,7 +599,3 @@ The logger configuration allows you to specify various settings related to loggi
 - Description: The name of the log file.
 - Type: String
 - Default Value: `chainstorage-cli-log`
-
-
-
-
