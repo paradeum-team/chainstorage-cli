@@ -21,8 +21,15 @@ THE SOFTWARE.
 */
 package main
 
-import "github.com/paradeum-team/chainstorage-cli/cmd"
+import (
+	"github.com/paradeum-team/chainstorage-cli/cmd"
+)
+
+var version string
 
 func main() {
+	//fmt.Println("Version:", version)
+	cmd.CliVersion = version
 	cmd.Execute()
+
 }
