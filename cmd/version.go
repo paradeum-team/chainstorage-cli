@@ -7,8 +7,10 @@ import (
 	"runtime"
 )
 
-// CurrentVersionNumber is the current application's version literal
-const CurrentVersionNumber = "0.0.4"
+//// CurrentVersionNumber is the current application's version literal
+//const CurrentVersionNumber = "0.0.4"
+
+var CliVersion string
 
 func GetApiVersion() string {
 	sdk, err := chainstoragesdk.New(&appConfig)
@@ -34,9 +36,10 @@ type VersionInfo struct {
 }
 
 func GetVersionInfo() *VersionInfo {
+	//fmt.Println("CliVersion:", CliVersion)
 	return &VersionInfo{
 		ApiVersion: GetApiVersion(),
-		Version:    CurrentVersionNumber,
+		Version:    CliVersion,
 		System:     runtime.GOARCH + "/" + runtime.GOOS,
 		Golang:     runtime.Version(),
 	}
