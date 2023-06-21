@@ -1,10 +1,22 @@
 package cmd
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/Code-Hex/pget"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-unixfsnode"
+	"github.com/ipfs/go-unixfsnode/data"
+	dagpb "github.com/ipld/go-codec-dagpb"
+	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/codec/dagcbor"
+	"github.com/ipld/go-ipld-prime/codec/dagjson"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/node/basicnode"
+	"github.com/ipld/go-ipld-prime/storage/memstore"
+	"github.com/multiformats/go-multicodec"
 	chainstoragesdk "github.com/paradeum-team/chainstorage-sdk"
 	sdkcode "github.com/paradeum-team/chainstorage-sdk/code"
 	"github.com/paradeum-team/chainstorage-sdk/consts"
@@ -17,6 +29,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"text/template"
 	"time"
@@ -764,9 +777,10 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 		objectCid = respObject.Data.ObjectCid
 	}
 
-	isFolder := respObject.Data.ObjectTypeCode == consts.ObjectTypeCodeDir
-	if isFolder {
-		downloadFolderData(cmd, args, &respObject)
+	isDir := respObject.Data.ObjectTypeCode == consts.ObjectTypeCodeDir
+	if isDir {
+		//downloadDirData(cmd, args, &respObject)
+		downloadDirDataViaDagData(cmd, args, &respObject)
 		return
 	}
 
@@ -776,6 +790,15 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 	//ipfsGateway := cliConfig.IpfsGateway
 	//downloadUrl := ipfsGateway + objectCid
 
+	err = downloadFile(objectCid, objectName, downloadFolder)
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	objectDownloadRunOutput(cmd, args, respObject)
+}
+
+func downloadFile(objectCid string, objectName string, downloadFolder string) error {
 	downloadUrl := generateDownloadUrl(objectCid, false)
 	outputPath := objectName
 	if len(downloadFolder) != 0 {
@@ -793,10 +816,28 @@ func objectDownloadRun(cmd *cobra.Command, args []string) {
 		//} else {
 		//	fmt.Fprintf(os.Stderr, "Error:\n  %v\n", err)
 		//}
-		Error(cmd, args, err)
+		//Error(cmd, args, err)
+
+		log.WithError(err).
+			WithFields(logrus.Fields{
+				"objectCid":      objectCid,
+				"objectName":     objectName,
+				"downloadFolder": downloadFolder,
+				"outputPath":     outputPath,
+			}).Error("Fail to download file")
+		//fmt.Printf("Error:%+v\n", err)
+
+		return err
 	}
 
-	objectDownloadRunOutput(cmd, args, respObject)
+	log.WithFields(logrus.Fields{
+		"objectCid":      objectCid,
+		"objectName":     objectName,
+		"downloadFolder": downloadFolder,
+		"outputPath":     outputPath,
+	}).Info("Success to download file")
+
+	return nil
 }
 
 func objectDownloadRunOutput(cmd *cobra.Command, args []string, resp model.ObjectCreateResponse) {
@@ -842,7 +883,7 @@ type ObjectDownloadOutput struct {
 	Data      ObjectOutput `json:"objectOutput,omitempty"`
 }
 
-func downloadFolderData(cmd *cobra.Command, args []string, respObject *model.ObjectCreateResponse) {
+func downloadDirDataFromCar(cmd *cobra.Command, args []string, respObject *model.ObjectCreateResponse) {
 	objectCid := respObject.Data.ObjectCid
 	objectName := respObject.Data.ObjectName
 	downloadUrl := generateDownloadUrl(objectCid, true)
@@ -868,31 +909,31 @@ func downloadFolderData(cmd *cobra.Command, args []string, respObject *model.Obj
 	}
 
 	// 用户自定义目录
-	downloadFolder, err := cmd.Flags().GetString("downloadfolder")
+	downloadDir, err := cmd.Flags().GetString("downloadfolder")
 	if err != nil {
 		Error(cmd, args, err)
 	}
 
 	// make data folder
-	folderDestination := objectName
-	if len(downloadFolder) != 0 {
-		folderDestination = filepath.Join(downloadFolder, objectName)
+	dirDestination := objectName
+	if len(downloadDir) != 0 {
+		dirDestination = filepath.Join(downloadDir, objectName)
 	}
 
 	// Check if the folder exists
-	if _, err := os.Stat(folderDestination); os.IsNotExist(err) {
+	if _, err := os.Stat(dirDestination); os.IsNotExist(err) {
 		// Folder does not exist, create a new folder
-		err := os.MkdirAll(folderDestination, 0755)
+		err := os.MkdirAll(dirDestination, 0755)
 		if err != nil {
 			fmt.Println("Failed to create folder:", err)
 			Error(cmd, args, err)
 		}
 
-		fmt.Println("Folder created:", folderDestination)
+		fmt.Println("Folder created:", dirDestination)
 	}
 
 	// extract car, delete temp car, override file
-	err = sdk.Car.ExtractCarFile(outputPath, folderDestination)
+	err = sdk.Car.ExtractCarFile(outputPath, dirDestination)
 	if err != nil {
 		Error(cmd, args, err)
 	}
@@ -915,25 +956,273 @@ func downloadFolderData(cmd *cobra.Command, args []string, respObject *model.Obj
 	objectDownloadRunOutput(cmd, args, *respObject)
 }
 
-// endregion Object Download
+func downloadDirData(cmd *cobra.Command, args []string, respObject *model.ObjectCreateResponse) {
+	objectCid := respObject.Data.ObjectCid
+	objectName := respObject.Data.ObjectName
 
-func generateDownloadUrl(objectCid string, isFolder bool) string {
+	// 用户自定义目录
+	downloadDir, err := cmd.Flags().GetString("downloadfolder")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	// make data folder
+	outputDir := objectName
+	if len(downloadDir) != 0 {
+		outputDir = filepath.Join(downloadDir, objectName)
+	}
+
+	// Check if the folder exists
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		// Folder does not exist, create a new folder
+		err := os.MkdirAll(outputDir, 0755)
+
+		if err != nil {
+			//fmt.Println("Failed to create folder:", err)
+			log.Error(err)
+			Error(cmd, args, err)
+		}
+
+		log.WithFields(logrus.Fields{
+			"objectCid":   objectCid,
+			"objectName":  objectName,
+			"downloadDir": downloadDir,
+			"outputDir":   outputDir,
+		}).Info("Success to create folder")
+		//fmt.Println("Folder created:", outputDir)
+	}
+
+	//// extract car, delete temp car, override file
+	//err = sdk.Car.ExtractCarFile(outputPath, outputDir)
+	//if err != nil {
+	//	Error(cmd, args, err)
+	//}
+	//defer func(fileDestination string) {
+	//	//if !viper.GetBool("cli.cleanTmpData") {
+	//	if !cliConfig.CleanTmpData {
+	//		return
+	//	}
+	//
+	//	err := os.Remove(fileDestination)
+	//	if err != nil {
+	//		log.WithError(err).
+	//			WithFields(logrus.Fields{
+	//				"fileDestination": fileDestination,
+	//			}).Error("Fail to remove car file")
+	//		//fmt.Printf("Error:%+v\n", err)
+	//	}
+	//}(outputPath)
+
+	// todo: progress bar should be displayed based on total size? and need stat total amount of downloading
+
+	err = extractRoot(objectCid, outputDir)
+	if err != nil {
+		log.WithError(err).
+			WithFields(logrus.Fields{
+				"objectCid": objectCid,
+				"outputDir": outputDir,
+			}).Error("Fail to extract data from folder")
+		//fmt.Printf("Error:%+v\n", err)
+		Error(cmd, args, err)
+	}
+
+	// get dag data from ipfs gateway, and extract root dir info
+
+	// iterate dag data
+
+	// get http header info and check if it could be downloaded
+
+	// the senario could be downloaded, and download it directly to specify folder
+
+	// otherwise, continue to get dag data from ipfs gateway, and extract root dir info, recursively
+
+	objectDownloadRunOutput(cmd, args, *respObject)
+}
+
+func downloadDirDataViaDagData(cmd *cobra.Command, args []string, respObject *model.ObjectCreateResponse) {
+	objectCid := respObject.Data.ObjectCid
+	objectName := respObject.Data.ObjectName
+
+	// 用户自定义目录
+	downloadDir, err := cmd.Flags().GetString("downloadFolder")
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
+	// make data folder
+	outputDir := objectName
+	if len(downloadDir) != 0 {
+		outputDir = filepath.Join(downloadDir, objectName)
+	}
+
+	// Check if the folder exists
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		// Folder does not exist, create a new folder
+		err := os.MkdirAll(outputDir, 0755)
+
+		if err != nil {
+			//fmt.Println("Failed to create folder:", err)
+			log.Error(err)
+			Error(cmd, args, err)
+		}
+
+		log.WithFields(logrus.Fields{
+			"objectCid":   objectCid,
+			"objectName":  objectName,
+			"downloadDir": downloadDir,
+			"outputDir":   outputDir,
+		}).Info("Success to create folder")
+		//fmt.Println("Folder created:", outputDir)
+	}
+
+	nodes, err := extractFileNodes(objectCid, objectName, outputDir)
+	if err != nil {
+		log.WithError(err).
+			WithFields(logrus.Fields{
+				"objectCid":  objectCid,
+				"objectName": objectName,
+				"outputDir":  outputDir,
+			}).Error("Fail to extract the info of file nodes from dag")
+		//fmt.Printf("Error:%+v\n", err)
+		Error(cmd, args, err)
+
+		return
+	}
+
+	failAmount := 0
+	totalAmount := 0
+	failSize := int64(0)
+	totalSize := int64(0)
+
+	fmt.Println()
+	fmt.Println("_/_/_/_/_/_/_/_/_/_/ download folder data start _/_/_/_/_/_/_/_/_/_/")
+	fmt.Println("cid:", objectCid)
+	fmt.Println("name:", objectName)
+	for _, v := range nodes {
+		cid := v.cid
+		name := v.name
+		relativePath := v.relativePath
+		log.WithFields(logrus.Fields{
+			"objectCid":    objectCid,
+			"cid":          cid,
+			"name":         name,
+			"outputDir":    outputDir,
+			"relativePath": relativePath,
+		}).Info("download file in folder")
+
+		// Check if the folder exists
+		if _, err := os.Stat(relativePath); os.IsNotExist(err) {
+			// Folder does not exist, create a new folder
+			err := os.MkdirAll(relativePath, 0755)
+
+			if err != nil {
+				//fmt.Println("Failed to create folder:", err)
+				log.Error(err)
+				Error(cmd, args, err)
+			}
+
+			log.WithFields(logrus.Fields{
+				"objectCid":    objectCid,
+				"cid":          cid,
+				"name":         name,
+				"outputDir":    outputDir,
+				"relativePath": relativePath,
+			}).Info("Success to create folder")
+			//fmt.Println("Folder created:", outputDir)
+		}
+
+		if err := downloadFile(cid, name, relativePath); err != nil {
+			log.WithError(err).
+				WithFields(logrus.Fields{
+					"objectCid":    objectCid,
+					"objectName":   objectName,
+					"cid":          cid,
+					"name":         name,
+					"outputDir":    outputDir,
+					"relativePath": relativePath,
+				}).Error("Fail to download file in folder")
+			//fmt.Printf("Error:%+v\n", err)
+			Error(cmd, args, err)
+			failSize += v.size
+			failAmount++
+			//return
+		}
+
+		totalSize += v.size
+		totalAmount++
+	}
+
+	fmt.Println("download total amount:", totalAmount, ",total fail amount:", failAmount)
+	fmt.Println("download total size:", totalSize, ",total fail size:", failSize)
+	fmt.Println("_/_/_/_/_/_/_/_/_/_/ download folder data end _/_/_/_/_/_/_/_/_/_/")
+	fmt.Println()
+
+	//// extract car, delete temp car, override file
+	//err = sdk.Car.ExtractCarFile(outputPath, outputDir)
+	//if err != nil {
+	//	Error(cmd, args, err)
+	//}
+	//defer func(fileDestination string) {
+	//	//if !viper.GetBool("cli.cleanTmpData") {
+	//	if !cliConfig.CleanTmpData {
+	//		return
+	//	}
+	//
+	//	err := os.Remove(fileDestination)
+	//	if err != nil {
+	//		log.WithError(err).
+	//			WithFields(logrus.Fields{
+	//				"fileDestination": fileDestination,
+	//			}).Error("Fail to remove car file")
+	//		//fmt.Printf("Error:%+v\n", err)
+	//	}
+	//}(outputPath)
+
+	// todo: progress bar should be displayed based on total size? and need stat total amount of downloading
+
+	//err = extractRoot(objectCid, outputDir)
+	//if err != nil {
+	//	log.WithError(err).
+	//		WithFields(logrus.Fields{
+	//			"objectCid": objectCid,
+	//			"outputDir": outputDir,
+	//		}).Error("Fail to extract data from folder")
+	//	//fmt.Printf("Error:%+v\n", err)
+	//	Error(cmd, args, err)
+	//}
+
+	// get dag data from ipfs gateway, and extract root dir info
+
+	// iterate dag data
+
+	// get http header info and check if it could be downloaded
+
+	// the senario could be downloaded, and download it directly to specify folder
+
+	// otherwise, continue to get dag data from ipfs gateway, and extract root dir info, recursively
+
+	objectDownloadRunOutput(cmd, args, *respObject)
+}
+
+// generate downloading url
+func generateDownloadUrl(objectCid string, getDag bool) string {
 	downloadUrl := ""
-
 	ipfsGateway := cliConfig.IpfsGateway
+
 	base, err := url.Parse(ipfsGateway)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
 	ref, err := url.Parse(objectCid)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
-	if isFolder {
+	if getDag {
 		queryString := ref.Query()
-		queryString.Set("format", "car")
+		//queryString.Set("format", "dag-cbor")
+		queryString.Set("format", "dag-json")
 		ref.RawQuery = queryString.Encode()
 	}
 
@@ -943,3 +1232,645 @@ func generateDownloadUrl(objectCid string, isFolder bool) string {
 
 	return downloadUrl
 }
+
+// parse the dag data to IPLD.Node object
+func parseDagData(objectCid string) (ipld.Node, ipld.Node, error) {
+	url := generateDownloadUrl(objectCid, true)
+	if len(url) == 0 {
+		return nil, nil, fmt.Errorf("fail to generate download url")
+	}
+
+	dagData, err := getDagData(url)
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return nil, nil, err
+	}
+
+	reader := bytes.NewReader(dagData)
+	opts := dagcbor.DecodeOptions{
+		AllowLinks: true,
+		//ExperimentalDeterminism: true,
+		DontParseBeyondEnd: true,
+	}
+
+	//builder := basicnode.Prototype.Map.NewBuilder()
+	builder := basicnode.Prototype.Any.NewBuilder()
+	err = opts.Decode(builder, reader)
+	if err != nil {
+		//fmt.Println("Failed to decode dag-cbor data:", err)
+		log.Error(err)
+		return nil, nil, err
+	}
+	node := builder.Build()
+
+	//if node.Kind() == ipld.Kind_Bytes {
+	if node.Kind() != ipld.Kind_Map {
+		return nil, nil, ErrNotDir
+	}
+
+	linkSystem := cidlink.DefaultLinkSystem()
+	storage := &memstore.Store{}
+	linkSystem.TrustedStorage = true
+	linkSystem.SetReadStorage(storage)
+	linkSystem.SetWriteStorage(storage)
+
+	// Store the IPLD node and get link back.
+	gotLink, err := linkSystem.Store(ipld.LinkContext{}, cidlink.LinkPrototype{
+		Prefix: cid.Prefix{
+			Version:  1,
+			Codec:    uint64(multicodec.DagPb),
+			MhType:   uint64(multicodec.Sha2_256),
+			MhLength: -1,
+		},
+	}, node)
+	if err != nil {
+		//fmt.Println("Failed to store dag data to Link System:", err)
+		log.Error(err)
+		return nil, nil, err
+	}
+	gotCidlink := gotLink.(cidlink.Link)
+
+	pbn, err := linkSystem.Load(ipld.LinkContext{}, gotCidlink, dagpb.Type.PBNode)
+	if err != nil {
+		//fmt.Println("Failed to load dag data from Link System:", err)
+		log.Error(err)
+		return nil, nil, err
+	}
+	pbnode := pbn.(dagpb.PBNode)
+
+	ufn, err := unixfsnode.Reify(ipld.LinkContext{}, pbnode, &linkSystem)
+	if err != nil {
+		//fmt.Println("Failed to reify unixfsnode:", err)
+		log.Error(err)
+		return nil, nil, err
+	}
+
+	return pbnode, ufn, nil
+}
+
+// extract the root of folder
+func extractRoot(objectCid, outputDir string) error {
+	//outputDir = "myfolder"
+	//objectCid = "bafybeibhrzxon75wfciqa3jcdbrfdepvbbjpn67wffxrl47i74jrkl2ewi"
+	pbnode, ufn, err := parseDagData(objectCid)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	// check if it is folder
+	if ufn.Kind() != ipld.Kind_Map {
+		return ErrNotDir
+	}
+
+	links, err := pbnode.LookupByString("Links")
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return err
+	}
+
+	li := links.ListIterator()
+	for !li.Done() {
+		_, v, err := li.Next()
+		if err != nil {
+			//fmt.Println("Error:", err)
+			log.Error(err)
+			return err
+		}
+
+		pbLink := v.(dagpb.PBLink)
+		name, err := pbLink.Name.AsNode().AsString()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+
+		vl, err := pbLink.Hash.AsLink()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+
+		//size, err := pbLink.Tsize.AsNode().AsInt()
+		//if err != nil {
+		//	log.Error(err)
+		//	return err
+		//}
+
+		//fmt.Println("Name:", name)
+		//fmt.Println("Hash:", vl.String())
+		//fmt.Println("Tsize:", size)
+		//fmt.Println(pbLink)
+
+		cid := vl.String()
+		//childNode, err := extractFolder(cid, outputDir, name)
+		_, err = extractFolder(cid, outputDir, name)
+		if err != nil {
+			if !errors.Is(err, ErrNotDir) {
+				log.Error(err)
+				return fmt.Errorf("%s: %w", cid, err)
+			}
+
+			//// if it's not a directory, it's a file.
+			//ufsData, err := childNode.LookupByString("Data")
+			//if err != nil {
+			//	return err
+			//}
+			//
+			//ufsBytes, err := ufsData.AsBytes()
+			//if err != nil {
+			//	return err
+			//}
+			//
+			//ufsNode, err := data.DecodeUnixFSData(ufsBytes)
+			//if err != nil {
+			//	return err
+			//}
+			//
+			//if ufsNode.DataType.Int() == data.Data_File || ufsNode.DataType.Int() == data.Data_Raw {
+			//	//fmt.Printf("download file(%s) to %s\n", name, outputDir)
+
+			log.WithFields(logrus.Fields{
+				"objectCid": objectCid,
+				"cid":       cid,
+				"name":      name,
+				"outputDir": outputDir,
+			}).Info("download file in folder")
+
+			if err := downloadFile(cid, name, outputDir); err != nil {
+				return err
+			}
+			//}
+		}
+	}
+
+	return nil
+}
+
+// extract folder data
+func extractFolder(objectCid, outputDir, objectName string) (ipld.Node, error) {
+	//println("Cid:", objectCid)
+	pbnode, ufn, err := parseDagData(objectCid)
+	if err != nil {
+		//log.Error(err)
+		return nil, err
+	}
+
+	if ufn.Kind() != ipld.Kind_Map {
+		return pbnode, ErrNotDir
+	}
+
+	downloadDir := outputDir
+	outputDir = path.Join(outputDir, objectName)
+	//fmt.Println("Make dir:", outputDir)
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		// Folder does not exist, create a new folder
+		err := os.MkdirAll(outputDir, 0755)
+		if err != nil {
+			//fmt.Println("Failed to create folder:", err)
+			log.Error(err)
+			return pbnode, err
+		}
+
+		log.WithFields(logrus.Fields{
+			"objectCid":   objectCid,
+			"objectName":  objectName,
+			"downloadDir": downloadDir,
+			"outputDir":   outputDir,
+		}).Info("Success to create folder")
+		//fmt.Println("Folder created:", dirDestination)
+	}
+
+	links, err := pbnode.LookupByString("Links")
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return pbnode, err
+	}
+
+	li := links.ListIterator()
+	for !li.Done() {
+		_, v, err := li.Next()
+		if err != nil {
+			//fmt.Println("Error:", err)
+			log.Error(err)
+			return pbnode, err
+		}
+
+		pbLink := v.(dagpb.PBLink)
+		name, err := pbLink.Name.AsNode().AsString()
+		if err != nil {
+			log.Error(err)
+			return pbnode, err
+		}
+
+		vl, err := pbLink.Hash.AsLink()
+		if err != nil {
+			log.Error(err)
+			return pbnode, err
+		}
+
+		//size, err := pbLink.Tsize.AsNode().AsInt()
+		//if err != nil {
+		//	log.Error(err)
+		//	return pbnode, err
+		//}
+
+		//fmt.Println("Name:", name)
+		//fmt.Println("Hash:", vl.String())
+		//fmt.Println("Tsize:", size)
+		//fmt.Println(pbLink)
+
+		cid := vl.String()
+		//childNode, err := extractFolder(cid, outputDir, name)
+		_, err = extractFolder(cid, outputDir, name)
+		if err != nil {
+			if !errors.Is(err, ErrNotDir) {
+				log.Error(err)
+				return pbnode, fmt.Errorf("%s: %w", cid, err)
+			}
+
+			//// if it's not a directory, it's a file.
+			//ufsData, err := childNode.LookupByString("Data")
+			//if err != nil {
+			//	return pbnode, err
+			//}
+			//
+			//ufsBytes, err := ufsData.AsBytes()
+			//if err != nil {
+			//	return pbnode, err
+			//}
+			//
+			//ufsNode, err := data.DecodeUnixFSData(ufsBytes)
+			//if err != nil {
+			//	return pbnode, err
+			//}
+			//
+			//if ufsNode.DataType.Int() == data.Data_File || ufsNode.DataType.Int() == data.Data_Raw {
+			//	//fmt.Printf("download file(%s) to %s\n", name, outputDir)
+
+			log.WithFields(logrus.Fields{
+				"objectCid": objectCid,
+				"cid":       cid,
+				"name":      name,
+				"outputDir": outputDir,
+			}).Info("download file in folder")
+
+			if err := downloadFile(cid, name, outputDir); err != nil {
+				return pbnode, err
+			}
+			//}
+		}
+	}
+
+	return pbnode, nil
+}
+
+// extract the info of file node from dags
+func extractFileNodes(objectCid, objectName, outputDir string) ([]DagFileNode, error) {
+	url := generateDownloadUrl(objectCid, true)
+
+	dagData, err := getDagData(url)
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return nil, err
+	}
+
+	reader := bytes.NewReader(dagData)
+
+	bufioReader := bufio.NewReader(reader)
+	opts := dagjson.DecodeOptions{
+		ParseLinks:         true,
+		ParseBytes:         true,
+		DontParseBeyondEnd: true,
+	}
+
+	nb1 := basicnode.Prototype.Any.NewBuilder()
+	err = opts.Decode(nb1, bufioReader)
+	if err != nil {
+		//fmt.Println("Failed to decode:", err)
+		log.Error(err)
+		return nil, err
+	}
+
+	node := nb1.Build()
+
+	//fmt.Println("Kind():", node.Kind())
+	// not found root dir, should considerate into single file?
+	if node.Kind() == ipld.Kind_Bytes {
+		//fmt.Println("Error:", ErrNotDir)
+		log.Error(ErrNotDir)
+		return nil, ErrNotDir
+	}
+
+	if node.Kind() != ipld.Kind_Map {
+		//fmt.Println("Error:", ErrNotDir)
+		log.Error(ErrNotDir)
+		return nil, ErrNotDir
+	}
+
+	// interpret dagpb 'data' as unixfs data and look at type.
+	ufsData, err := node.LookupByString("Data")
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return nil, err
+	}
+
+	ufsBytes, err := ufsData.AsBytes()
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return nil, err
+	}
+
+	ufsNode, err := data.DecodeUnixFSData(ufsBytes)
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return nil, err
+	}
+
+	// check if it is a folder
+	isDir := ufsNode.DataType.Int() == data.Data_Directory
+	if !isDir {
+		//fmt.Println("Error:", ErrNotDir)
+		log.Error(ErrNotDir)
+		return nil, ErrNotDir
+	}
+
+	nodes := []DagFileNode{}
+	if node.Kind() == ipld.Kind_Map {
+		links, err := node.LookupByString("Links")
+		if err != nil {
+			//fmt.Println("Error:", err)
+			log.Error(err)
+			return nil, err
+		}
+
+		li := links.ListIterator()
+		for !li.Done() {
+			_, v, err := li.Next()
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return nil, err
+			}
+
+			if v.Kind() != ipld.Kind_Map {
+				continue
+			}
+
+			hashNode, err := v.LookupByString("Hash")
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return nil, err
+			}
+
+			cid, err := hashNode.AsLink()
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return nil, err
+			}
+
+			nameNode, err := v.LookupByString("Name")
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return nil, err
+			}
+
+			name, err := nameNode.AsString()
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return nil, err
+			}
+
+			//sizeNode, err := v.LookupByString("Tsize")
+			//if err != nil {
+			//	//fmt.Println("Error:", err)
+			//	log.Error(err)
+			//	return nil, err
+			//}
+			//
+			//size, err := sizeNode.AsInt()
+			//if err != nil {
+			//	//fmt.Println("Error:", err)
+			//	log.Error(err)
+			//	return nil, err
+			//}
+
+			//fmt.Println("Name:", name)
+			//fmt.Println("Hash:", cid.String())
+			//fmt.Println("Tsize:", size)
+			//fmt.Println("Kind():", v.Kind())
+
+			err = traverseDag(cid.String(), name, outputDir, &nodes)
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return nil, err
+			}
+		}
+	}
+
+	return nodes, nil
+}
+
+// traverse dag
+func traverseDag(objectCid, objectName, outputDir string, nodes *[]DagFileNode) error {
+	url := generateDownloadUrl(objectCid, true)
+
+	dagData, err := getDagData(url)
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return err
+	}
+
+	reader := bytes.NewReader(dagData)
+	opts := dagjson.DecodeOptions{
+		ParseLinks:         true,
+		ParseBytes:         true,
+		DontParseBeyondEnd: true,
+	}
+
+	nb1 := basicnode.Prototype.Any.NewBuilder()
+	err = opts.Decode(nb1, reader)
+	if err != nil {
+		//fmt.Println("Failed to decode:", err)
+		log.Error(err)
+		return err
+	}
+
+	node := nb1.Build()
+
+	// it is a file
+	if node.Kind() == ipld.Kind_Bytes {
+		fileNode := DagFileNode{}
+		fileNode.cid = objectCid
+		fileNode.name = objectName
+
+		bytes, err := node.AsBytes()
+		if err != nil {
+			//fmt.Println("Error:", err)
+			log.Error(err)
+			return err
+		}
+		fileNode.size = int64(len(bytes))
+
+		fileNode.relativePath = outputDir
+		*nodes = append(*nodes, fileNode)
+
+		return nil
+	}
+
+	// interpret dagpb 'data' as unixfs data and look at type.
+	ufsData, err := node.LookupByString("Data")
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return err
+	}
+
+	ufsBytes, err := ufsData.AsBytes()
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return err
+	}
+
+	ufsNode, err := data.DecodeUnixFSData(ufsBytes)
+	if err != nil {
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return err
+	}
+
+	switch ufsNode.DataType.Int() {
+	case data.Data_Directory, data.Data_HAMTShard:
+		outputDir = path.Join(outputDir, objectName)
+
+	case data.Data_File, data.Data_Raw:
+		fileNode := DagFileNode{}
+		fileNode.cid = objectCid
+		fileNode.name = objectName
+
+		size, err := ufsNode.FileSize.AsNode().AsInt()
+		if err != nil {
+			//fmt.Println("Error:", err)
+			log.Error(err)
+			return err
+		}
+
+		fileNode.size = size
+		fileNode.relativePath = outputDir
+		*nodes = append(*nodes, fileNode)
+		return nil
+
+	case data.Data_Symlink:
+		return nil
+
+	default:
+		err := fmt.Errorf("unknown unixfs type: %d", ufsNode.DataType.Int())
+		//fmt.Println("Error:", err)
+		log.Error(err)
+		return err
+	}
+
+	if node.Kind() == ipld.Kind_Map {
+		links, err := node.LookupByString("Links")
+		if err != nil {
+			//fmt.Println("Error:", err)
+			log.Error(err)
+			return err
+		}
+
+		li := links.ListIterator()
+		for !li.Done() {
+			_, v, err := li.Next()
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return err
+			}
+
+			if v.Kind() != ipld.Kind_Map {
+				continue
+			}
+
+			hashNode, err := v.LookupByString("Hash")
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return err
+			}
+
+			cid, err := hashNode.AsLink()
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return err
+			}
+
+			nameNode, err := v.LookupByString("Name")
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return err
+			}
+
+			name, err := nameNode.AsString()
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return err
+			}
+
+			//sizeNode, err := v.LookupByString("Tsize")
+			//if err != nil {
+			//	//fmt.Println("Error:", err)
+			//	log.Error(err)
+			//	return err
+			//}
+			//
+			//size, err := sizeNode.AsInt()
+			//if err != nil {
+			//	//fmt.Println("Error:", err)
+			//	log.Error(err)
+			//	return err
+			//}
+
+			//fmt.Println("Name:", name)
+			//fmt.Println("Hash:", cid.String())
+			//fmt.Println("Tsize:", size)
+			//fmt.Println("Kind():", v.Kind())
+
+			err = traverseDag(cid.String(), name, outputDir, nodes)
+			if err != nil {
+				//fmt.Println("Error:", err)
+				log.Error(err)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+var ErrNotDir = fmt.Errorf("not a directory")
+
+type DagFileNode struct {
+	cid          string
+	name         string
+	size         int64
+	relativePath string
+}
+
+// endregion Object Download

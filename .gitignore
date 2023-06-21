@@ -28,5 +28,6 @@ logs/
 /testserver/*
 /testserver
 myfolder
+myfolder2
 myfolder_download
 xyz
