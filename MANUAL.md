@@ -68,7 +68,7 @@ gcscmd config
 The `get` command allows you to retrieve an object from the system. Use the following syntax:
 
 ```shell
-gcscmd get cs://<BUCKET> [--name=<name>] [--cid=<cid>] [--downloadfolder=<downloadfolder>] [flags]
+gcscmd get cs://<BUCKET> [--name=<name>] [--cid=<cid>] [--downloadFolder=<downloadfolder>] [flags]
 ```
 
 Replace `<BUCKET>` with the name of the bucket where the object is located. You can optionally specify the name or CID of the object using the `--name` or `--cid` flags, respectively.
@@ -77,7 +77,7 @@ Replace `<BUCKET>` with the name of the bucket where the object is located. You 
 
 - `-c, --cid <cid>`: The CID of the object you want to retrieve.
 - `-n, --name <name>`: The name of the object you want to retrieve.
-- `-d, --downloadfolder <downloadfolder>`: The folder of download.
+- `-d, --downloadFolder <downloadfolder>`: The folder of download.
 
 #### Example
 
