@@ -214,9 +214,9 @@ func convertSizeUnit(size int64) string {
 }
 
 // 获取上传数据使用量
-func getUploadingDataUsage(dataPath string) (int, int64, error) {
+func getUploadingDataUsage(dataPath string) (int64, int64, error) {
 	var totalSize int64
-	var fileAmount int
+	var fileAmount int64
 
 	// 数据路径为空
 	if len(dataPath) == 0 {

@@ -610,17 +610,23 @@ func carImportRun(cmd *cobra.Command, args []string) {
 // 检查上传数据使用限制
 func checkDataUsageLimitation(sdk *chainstoragesdk.CssClient, storageNetworkCode int, dataPath string) error {
 	// 检查可用空间
-	usersQuota, err := sdk.Bucket.GetUsersQuotaByStorageNetworkCode(storageNetworkCode)
+	usersQuotaResp, err := sdk.Bucket.GetUsersQuotaByStorageNetworkCode(storageNetworkCode)
 	if err != nil {
 		return err
+	}
+
+	usersQuota := usersQuotaResp.Data
+	usersQuotaDetails := usersQuota.Details
+	if len(usersQuotaDetails) == 0 {
+		return sdkcode.ErrBucketQuotaFetchFail
 	}
 
 	// 基础版本
 	isBasicVersion := usersQuota.PackagePlanId == 21001
 	availableStorageSpace := int64(0)
 	availableFileAmount := int64(0)
+	availableUploadDirItems := int64(0)
 
-	usersQuotaDetails := usersQuota.Details
 	for _, usersQuotaDetail := range usersQuotaDetails {
 		// 空间存储限制
 		if usersQuotaDetail.ConstraintName == consts.ConstraintStorageSpace.String() {
@@ -633,6 +639,12 @@ func checkDataUsageLimitation(sdk *chainstoragesdk.CssClient, storageNetworkCode
 			//availableFileAmount = usersQuotaDetail.Available
 			availableFileAmount = usersQuotaDetail.LimitedQuota - usersQuotaDetail.UsedQuota
 		}
+
+		// 上传文件夹条目限制
+		if usersQuotaDetail.ConstraintName == consts.ConstraintUploadDirItems.String() {
+			//availableUploadDirItems = usersQuotaDetail.Available
+			availableUploadDirItems = usersQuotaDetail.LimitedQuota - usersQuotaDetail.UsedQuota
+		}
 	}
 
 	// 可用文件存储限制超限
@@ -640,12 +652,18 @@ func checkDataUsageLimitation(sdk *chainstoragesdk.CssClient, storageNetworkCode
 		return sdkcode.ErrCarUploadFileExccedObjectAmountUsage
 	}
 
-	if isBasicVersion {
-		_, totalSize, err := getUploadingDataUsage(dataPath)
-		if err != nil {
-			return err
-		}
+	// 获取上传数据使用量
+	fileAmount, totalSize, err := getUploadingDataUsage(dataPath)
+	if err != nil {
+		return err
+	}
 
+	// 上传文件夹条目限制超限
+	if fileAmount > availableUploadDirItems {
+		return sdkcode.ErrCarUploadFileExccedObjectAmountUsage
+	}
+
+	if isBasicVersion {
 		// 可用存储空间超限
 		if totalSize > availableStorageSpace {
 			return sdkcode.ErrCarUploadFileExccedStorageSpaceUsage
