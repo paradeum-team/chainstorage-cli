@@ -89,6 +89,13 @@ func carUploadRun(cmd *cobra.Command, args []string) {
 	// 桶ID
 	bucketId := respBucket.Data.Id
 
+	// 检查上传数据使用限制
+	storageNetworkCode := respBucket.Data.StorageNetworkCode
+	err = checkDataUsageLimitation(sdk, storageNetworkCode, dataPath)
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
 	// 对象上传
 	response, err := UploadData(sdk, bucketId, dataPath)
 	if err != nil {
@@ -584,6 +591,13 @@ func carImportRun(cmd *cobra.Command, args []string) {
 	// 桶ID
 	bucketId := respBucket.Data.Id
 
+	// 检查上传数据使用限制
+	storageNetworkCode := respBucket.Data.StorageNetworkCode
+	err = checkDataUsageLimitation(sdk, storageNetworkCode, dataPath)
+	if err != nil {
+		Error(cmd, args, err)
+	}
+
 	// 对象上传
 	response, err := ImportData(sdk, bucketId, dataPath)
 	if err != nil {
@@ -591,6 +605,54 @@ func carImportRun(cmd *cobra.Command, args []string) {
 	}
 
 	carImportRunOutput(cmd, args, response)
+}
+
+// 检查上传数据使用限制
+func checkDataUsageLimitation(sdk *chainstoragesdk.CssClient, storageNetworkCode int, dataPath string) error {
+	// 检查可用空间
+	usersQuota, err := sdk.Bucket.GetUsersQuotaByStorageNetworkCode(storageNetworkCode)
+	if err != nil {
+		return err
+	}
+
+	// 基础版本
+	isBasicVersion := usersQuota.PackagePlanId == 21001
+	availableStorageSpace := int64(0)
+	availableFileAmount := int64(0)
+
+	usersQuotaDetails := usersQuota.Details
+	for _, usersQuotaDetail := range usersQuotaDetails {
+		// 空间存储限制
+		if usersQuotaDetail.ConstraintName == consts.ConstraintStorageSpace.String() {
+			//availableStorageSpace = usersQuotaDetail.Available
+			availableStorageSpace = usersQuotaDetail.LimitedQuota - usersQuotaDetail.UsedQuota
+		}
+
+		// 对象存储限制
+		if usersQuotaDetail.ConstraintName == consts.ConstraintFileLimited.String() {
+			//availableFileAmount = usersQuotaDetail.Available
+			availableFileAmount = usersQuotaDetail.LimitedQuota - usersQuotaDetail.UsedQuota
+		}
+	}
+
+	// 可用文件存储限制超限
+	if availableFileAmount <= 0 {
+		return sdkcode.ErrCarUploadFileExccedObjectAmountUsage
+	}
+
+	if isBasicVersion {
+		_, totalSize, err := getUploadingDataUsage(dataPath)
+		if err != nil {
+			return err
+		}
+
+		// 可用存储空间超限
+		if totalSize > availableStorageSpace {
+			return sdkcode.ErrCarUploadFileExccedStorageSpaceUsage
+		}
+	}
+
+	return nil
 }
 
 func carImportRunOutput(cmd *cobra.Command, args []string, resp model.ObjectCreateResponse) {

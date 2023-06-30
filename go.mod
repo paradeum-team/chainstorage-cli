@@ -117,5 +117,3 @@ require (
 	github.com/multiformats/go-multicodec v0.8.1
 	github.com/paradeum-team/chainstorage-sdk v0.0.6
 )
-
-//replace github.com/paradeum-team/chainstorage-sdk => /Users/yuan/code/chainstorage-sdk

@@ -10,8 +10,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
+
+// sema is a counting semaphore for limiting concurrency in dirEntries.
+var sema = make(chan struct{}, 20)
 
 func Error(cmd *cobra.Command, args []string, err error) {
 	log.Errorf("execute %s args:%v error:%v\n", cmd.Name(), args, err)
@@ -207,4 +211,91 @@ func convertSizeUnit(size int64) string {
 	//fmt.Printf("size:%d\n", size)
 	//fmt.Printf("div:%d\n", div)
 	return fmt.Sprintf("%.1f%cB", convertedSize, "KMGTPEZY"[exp-1])
+}
+
+// 获取上传数据使用量
+func getUploadingDataUsage(dataPath string) (int, int64, error) {
+	var totalSize int64
+	var fileAmount int
+
+	// 数据路径为空
+	if len(dataPath) == 0 {
+		return 0, 0, sdkcode.ErrCarUploadFileInvalidDataPath
+	}
+
+	// 数据路径无效
+	fileInfo, err := os.Stat(dataPath)
+	if os.IsNotExist(err) {
+		return 0, 0, sdkcode.ErrCarUploadFileInvalidDataPath
+	} else if err != nil {
+		log.WithError(err).
+			WithField("dataPath", dataPath).
+			Error("fail to return stat of file")
+		return 0, 0, err
+	}
+
+	if !fileInfo.IsDir() {
+		fileAmount++
+		totalSize = fileInfo.Size()
+		return fileAmount, totalSize, nil
+	}
+
+	fileSizes := make(chan int64)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go walkDir(dataPath, &wg, fileSizes)
+
+	go func() {
+		wg.Wait()
+		close(fileSizes)
+	}()
+
+	for {
+		size, ok := <-fileSizes
+		if !ok {
+			break // fileSizes was closed
+		}
+
+		fileAmount++
+		totalSize += size
+	}
+
+	return fileAmount, totalSize, nil
+}
+
+func walkDir(dir string, wg *sync.WaitGroup, fileSizes chan<- int64) {
+	defer wg.Done()
+	for _, entry := range dirEntries(dir) {
+		if entry.IsDir() {
+			wg.Add(1)
+			subDir := filepath.Join(dir, entry.Name())
+			go walkDir(subDir, wg, fileSizes)
+		} else {
+			fileInfo, err := entry.Info()
+			if err != nil {
+				log.WithError(err).
+					WithField("dir", dir).
+					Error("fail to return stat of file")
+				return
+			}
+
+			fileSizes <- fileInfo.Size()
+		}
+	}
+}
+
+// dirEntries returns the entries of directory dir.
+func dirEntries(dir string) []os.DirEntry {
+	sema <- struct{}{}        // acquire token
+	defer func() { <-sema }() // release token
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.WithError(err).
+			WithField("dir", dir).
+			Error("fail to read dir")
+		return nil
+	}
+
+	return entries
 }
